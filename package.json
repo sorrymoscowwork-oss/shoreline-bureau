@@ -1,0 +1,16 @@
+{
+  "name": "shoreline-bureau",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Independent Property & Place Advisory — Hurghada, Egypt",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "preview": "cf dev"
+  },
+  "devDependencies": {
+    "cf": "^0.15.0",
+    "wrangler": "^4.163.0"
+  },
+  "type": "module"
+}
