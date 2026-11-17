@@ -32,6 +32,7 @@
     .landing { min-height:calc(100vh - 93px); position:relative; display:grid; grid-template-columns:50% 50%; overflow:hidden; background:#fff; }
     .landing-image { grid-column:1; grid-row:1; min-height:calc(100vh - 93px); overflow:hidden; background:#b6a28b; }
     .landing-image img { display:block; width:100%; height:100%; min-height:calc(100vh - 93px); object-fit:cover; object-position:center 52%; }
+    .landing-location { position:absolute; z-index:2; top:17.2%; left:0; width:50%; margin:0; padding:0 18px; color:#fff; text-align:center; font-size:clamp(9px,.85vw,12px); font-weight:600; letter-spacing:.2em; line-height:1.2; text-transform:uppercase; }
     .landing-wordmark { position:absolute; z-index:2; inset:23% 0 auto; width:100%; display:grid; grid-template-columns:50% 50%; align-items:baseline; margin:0; white-space:nowrap; font-size:clamp(30px,4.2vw,70px); line-height:.9; letter-spacing:-.095em; font-weight:700; pointer-events:none; }
     .landing-wordmark .shoreline { display:block; color:#fff; text-align:right; padding-right:.08em; }
     .landing-wordmark .bureau { display:block; position:relative; color:var(--ink); font-weight:400; text-align:left; padding-left:.08em; padding-right:.38em; }
@@ -44,6 +45,7 @@
       .landing { min-height:calc(100svh - 77px); grid-template-columns:50% 50%; }
       .landing-image, .landing-image img { min-height:calc(100svh - 77px); }
       .landing-image img { object-position:48% center; }
+      .landing-location { top:17.2%; padding:0 8px; font-size:8px; letter-spacing:.14em; }
       .landing-wordmark { inset:23% 0 auto; font-size:clamp(19px,6vw,32px); letter-spacing:-.09em; }
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
@@ -69,6 +71,7 @@
   <main>
     <section class="landing" aria-label="SHORELINE BUREAU">
       <div class="landing-image"><img src="/assets/shoreline-courtyard.png" alt="Sunlit residential architecture in Hurghada, Egypt"></div>
+      <p class="landing-location">Hurghada / Red Sea</p>
       <h1 class="landing-wordmark"><span class="shoreline">SHORELINE</span> <span class="bureau">BUREAU<sup>®</sup></span></h1>
     </section>
   </main>
