@@ -7,11 +7,11 @@
   <meta name="description" content="SHORELINE BUREAU — Independent Property & Place Advisory in Hurghada, Egypt.">
   <title>SHORELINE BUREAU — Independent Property & Place Advisory</title>
   <style>
-    :root { color-scheme: light; --ink:#171717; --muted:#77736d; --line:#e8e5df; --accent:#a66b52; }
+    :root { color-scheme:light; --ink:#171717; --muted:#77736d; --line:#e8e5df; --accent:#a66b52; }
     * { box-sizing:border-box; }
     html { min-height:100%; scroll-behavior:smooth; }
     body { min-height:100vh; margin:0; background:#fff; color:var(--ink); font-family:Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
-    .site-header { height:92px; padding:0 clamp(24px,5.2vw,84px); display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
+    .site-header { height:92px; padding:0 clamp(24px,5.2vw,84px); display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); position:relative; z-index:20; background:#fff; }
     .wordmark { color:var(--ink); text-decoration:none; font-size:clamp(19px,2vw,25px); font-weight:700; letter-spacing:-.075em; line-height:1; white-space:nowrap; }
     .wordmark span { font-weight:400; }
     .wordmark sup { margin-left:3px; font-size:.28em; font-weight:400; letter-spacing:0; vertical-align:top; }
@@ -29,13 +29,22 @@
     .menu-links a:hover, .menu-links a:focus-visible { color:var(--accent); }
     .menu-footer { margin-top:auto; padding-top:40px; color:var(--muted); font-size:11px; letter-spacing:.12em; text-transform:uppercase; }
     main { min-height:calc(100vh - 93px); }
-    .landing { min-height:calc(100vh - 93px); }
-    .page-content { padding:clamp(64px,10vw,140px) clamp(24px,9vw,144px); }
-    .page-content h1 { max-width:900px; margin:0; font-size:clamp(42px,8vw,100px); font-weight:400; letter-spacing:-.075em; line-height:.98; }
+    .landing { min-height:calc(100vh - 93px); position:relative; display:grid; grid-template-columns:50% 50%; overflow:hidden; background:#fff; }
+    .landing-image { grid-column:1; grid-row:1; min-height:calc(100vh - 93px); overflow:hidden; background:#b6a28b; }
+    .landing-image img { display:block; width:100%; height:100%; min-height:calc(100vh - 93px); object-fit:cover; object-position:center 52%; }
+    .landing-wordmark { position:absolute; z-index:2; left:5.2vw; top:50%; transform:translateY(-50%); margin:0; white-space:nowrap; font-size:clamp(48px,9.6vw,150px); line-height:.82; letter-spacing:-.095em; font-weight:700; pointer-events:none; }
+    .landing-wordmark .shoreline { color:#fff; }
+    .landing-wordmark .bureau { color:var(--ink); font-weight:400; }
+    .landing-wordmark sup { color:var(--ink); font-size:.16em; letter-spacing:0; vertical-align:top; margin-left:.18em; }
     @media (max-width:600px) {
       .site-header { height:76px; padding:0 22px; }
       .menu-panel { inset:76px 0 0; padding:52px 26px 32px; }
       .menu-toggle { gap:10px; font-size:10px; }
+      main { min-height:calc(100svh - 77px); }
+      .landing { min-height:calc(100svh - 77px); grid-template-columns:50% 50%; }
+      .landing-image, .landing-image img { min-height:calc(100svh - 77px); }
+      .landing-image img { object-position:48% center; }
+      .landing-wordmark { left:4.5vw; font-size:9.8vw; letter-spacing:-.09em; }
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
   </style>
@@ -57,7 +66,12 @@
     </div>
     <div class="menu-footer">Independent Property &amp; Place Advisory · Hurghada, Egypt</div>
   </nav>
-  <main class="landing" aria-label="SHORELINE BUREAU"></main>
+  <main>
+    <section class="landing" aria-label="SHORELINE BUREAU">
+      <div class="landing-image"><img src="/assets/shoreline-courtyard.png" alt="Sunlit residential architecture in Hurghada, Egypt"></div>
+      <h1 class="landing-wordmark"><span class="shoreline">SHORELINE</span> <span class="bureau">BUREAU</span><sup>®</sup></h1>
+    </section>
+  </main>
   <script>
     const toggle = document.querySelector('.menu-toggle');
     const menu = document.querySelector('.menu-panel');
