@@ -57,24 +57,9 @@
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
   </style>
-</head>
+<link rel="stylesheet" href="/assets/site-header.css"></head>
 <body>
-  <header class="site-header">
-    <div class="brand-lockup"><a class="wordmark" href="/" aria-label="SHORELINE BUREAU home">SHORELINE <span>BUREAU</span></a><span class="brand-division">A division of ALWEKALA</span></div>
-    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-menu">
-      <span>Menu</span><span class="menu-icon" aria-hidden="true"><i></i><i></i><i></i></span>
-    </button>
-  </header>
-  <nav class="menu-panel" id="site-menu" aria-label="Main navigation">
-    <p class="menu-kicker">Explore Shoreline Bureau</p>
-    <div class="menu-links">
-      <a href="/about/">About us</a>
-      <a href="/services/">Our services</a>
-      <a href="/pricing/">Pricing</a>
-      <a href="/process/">How we work</a>
-    </div>
-    <div class="menu-footer">Independent Property &amp; Place Advisory · Hurghada, Egypt</div>
-  </nav>
+  <div id="site-header-root"></div><script src="/assets/site-header.js" defer></script>
   <main>
     <section class="landing" aria-label="SHORELINE BUREAU">
       <div class="landing-image"><img src="/assets/shoreline-courtyard.png" alt="Sunlit residential architecture in Hurghada, Egypt"></div>
@@ -83,17 +68,6 @@
       <h1 class="landing-wordmark"><span class="shoreline">SHORELINE</span> <span class="bureau">BUREAU<sup>®</sup></span></h1>
     </section>
   </main>
-  <script>
-    const toggle = document.querySelector('.menu-toggle');
-    const menu = document.querySelector('.menu-panel');
-    function closeMenu() { toggle.setAttribute('aria-expanded','false'); menu.classList.remove('is-open'); }
-    toggle.addEventListener('click', () => {
-      const open = toggle.getAttribute('aria-expanded') !== 'true';
-      toggle.setAttribute('aria-expanded', String(open));
-      menu.classList.toggle('is-open', open);
-    });
-    menu.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMenu(); });
-  </script>
+  
 </body>
 </html>
