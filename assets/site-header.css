@@ -6,13 +6,16 @@
 .site-header .wordmark span{font-weight:400}
 .site-header .wordmark sup{margin-left:3px;font-size:.28em;font-weight:400;letter-spacing:0;vertical-align:top}
 .site-header .brand-division{display:block;align-self:flex-start;margin:0;padding:0;text-indent:0;font-size:8px;line-height:1;letter-spacing:.12em;text-transform:uppercase;font-weight:500;color:#777}
-.site-header .menu-toggle{display:flex;align-items:center;gap:15px;padding:12px 0 12px 16px;border:0;background:transparent;color:var(--ink);cursor:pointer;font:inherit;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.site-header .desktop-nav{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:clamp(22px,3vw,46px);white-space:nowrap}
+.site-header .desktop-nav a{color:var(--ink);text-decoration:none;font-size:11px;font-weight:500;letter-spacing:.08em;transition:color .2s ease}
+.site-header .desktop-nav a:hover{color:var(--accent)}
+.site-header .menu-toggle{display:none;align-items:center;gap:15px;padding:12px 0 12px 16px;border:0;background:transparent;color:var(--ink);cursor:pointer;font:inherit;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 .site-header .menu-icon{width:25px;height:18px;display:flex;flex-direction:column;justify-content:space-between}
 .site-header .menu-icon i{display:block;width:25px;height:1px;background:var(--ink);transition:transform .25s ease}
 .site-header .menu-toggle[aria-expanded=true] .menu-icon i:first-child{transform:translateY(8.5px) rotate(45deg)}
 .site-header .menu-toggle[aria-expanded=true] .menu-icon i:last-child{transform:translateY(-8.5px) rotate(-45deg)}
 .site-header .menu-toggle[aria-expanded=true] .menu-icon i:nth-child(2){opacity:0}
-.menu-panel{position:fixed;z-index:99;inset:92px 0 0;display:none;background:rgba(255,255,255,.985);padding:clamp(36px,7vw,100px) clamp(24px,9vw,144px);box-sizing:border-box}
+.menu-panel{display:none;position:fixed;z-index:99;inset:92px 0 0;display:none;background:rgba(255,255,255,.985);padding:clamp(36px,7vw,100px) clamp(24px,9vw,144px);box-sizing:border-box}
 .menu-panel.is-open{display:flex;flex-direction:column}
 .menu-kicker{margin:0 0 28px;color:var(--muted);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase}
 .menu-links{display:flex;flex-direction:column;align-items:flex-start;gap:clamp(15px,2.8vh,28px)}
@@ -20,5 +23,5 @@
 .menu-links a:hover{color:var(--accent)}
 .menu-footer{margin-top:auto;padding-top:40px;color:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
 body{padding-top:92px}
-@media(max-width:600px){.site-header{height:76px;padding:0 22px}.site-header .menu-toggle{gap:10px;font-size:10px}.menu-panel{inset:76px 0 0;padding:52px 26px 32px}body{padding-top:76px}}
+@media(max-width:600px){.site-header .desktop-nav{display:none}.site-header .menu-toggle{display:flex}.site-header{height:76px;padding:0 22px}.site-header .menu-toggle{gap:10px;font-size:10px}.menu-panel{inset:76px 0 0;padding:52px 26px 32px}body{padding-top:76px}}
 @media(prefers-reduced-motion:reduce){.site-header *{transition:none!important}}
