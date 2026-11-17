@@ -23,5 +23,5 @@
 .menu-links a:hover{color:var(--accent)}
 .menu-footer{margin-top:auto;padding-top:40px;color:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
 body{padding-top:92px}
-@media(max-width:600px){.site-header .desktop-nav{display:none}.site-header .menu-toggle{display:flex}.site-header{height:76px;padding:0 22px}.site-header .menu-toggle{gap:10px;font-size:10px}.menu-panel{inset:76px 0 0;padding:52px 26px 32px}body{padding-top:76px}}
+@media(max-width:600px){.site-header .brand-lockup{gap:2px}.site-header .desktop-nav{display:none}.site-header .menu-toggle{display:flex}.site-header{height:76px;padding:0 22px}.site-header .menu-toggle{gap:10px;font-size:10px}.menu-panel{inset:76px 0 0;padding:52px 26px 32px}body{padding-top:76px}}
 @media(prefers-reduced-motion:reduce){.site-header *{transition:none!important}}
