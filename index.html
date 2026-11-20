@@ -80,15 +80,17 @@
           return;
         }
 
-        const edge = Math.min(.008, Math.max(.002, crossing / 5));
+        const edge = .004;
+        const outboundCross = crossing * .5;
+        const returnCross = .5 + (1 - crossing) * .5;
         animation = boat.animate([
           { left: start + 'px', backgroundColor: '#fff', transform: 'scaleX(1)', offset: 0 },
-          { left: boundary + 'px', backgroundColor: '#fff', transform: 'scaleX(1)', offset: crossing },
-          { left: boundary + 'px', backgroundColor: '#337695', transform: 'scaleX(1)', offset: crossing + edge },
+          { left: boundary + 'px', backgroundColor: '#fff', transform: 'scaleX(1)', offset: outboundCross },
+          { left: boundary + 'px', backgroundColor: '#337695', transform: 'scaleX(1)', offset: outboundCross + edge },
           { left: finish + 'px', backgroundColor: '#337695', transform: 'scaleX(1)', offset: .5 },
           { left: finish + 'px', backgroundColor: '#337695', transform: 'scaleX(-1)', offset: .502 },
-          { left: boundary + 'px', backgroundColor: '#337695', transform: 'scaleX(-1)', offset: 1 - crossing },
-          { left: boundary + 'px', backgroundColor: '#fff', transform: 'scaleX(-1)', offset: 1 - crossing + edge },
+          { left: boundary + 'px', backgroundColor: '#337695', transform: 'scaleX(-1)', offset: returnCross },
+          { left: boundary + 'px', backgroundColor: '#fff', transform: 'scaleX(-1)', offset: returnCross + edge },
           { left: start + 'px', backgroundColor: '#fff', transform: 'scaleX(-1)', offset: 1 }
         ], { duration: 14000, iterations: Infinity, easing: 'linear' });
       }
