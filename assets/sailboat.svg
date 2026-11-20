@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140" role="img" aria-label="Sailboat">
+  <g fill="currentColor">
+    <path d="M88 10h5v83h-5z"/>
+    <path d="M88 14 31 91h57z"/>
+    <path d="M95 43 95 91h39z"/>
+    <path d="M22 98h137c-8 17-24 25-45 25H62c-18 0-31-8-40-25Z"/>
+    <path d="M12 127c15 0 15-6 30-6s15 6 30 6 15-6 30-6 15 6 30 6 15-6 30-6v5c-15 0-15 6-30 6s-15-6-30-6-15 6-30 6-15-6-30-6-15 6-30 6Z"/>
+  </g>
+</svg>
