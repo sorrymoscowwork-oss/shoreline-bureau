@@ -29,6 +29,13 @@ h1{max-width:1000px;margin:0;font-size:clamp(46px,8vw,104px);font-weight:400;let
 .service-meta{display:flex;flex-direction:column;gap:8px;margin-top:auto;padding-top:28px}
 .service-meta p{margin:0;color:#555;font-size:13px;line-height:1.55}
 .service-meta strong{color:var(--ink);font-weight:600}
+.service-card--custom{grid-column:1/-1;background:#faf9f6;border-color:#e5e1d9}
+.service-card--custom .service-top{border-color:#e5e1d9}
+.custom-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(260px,.9fr);gap:clamp(28px,6vw,88px);padding-top:4px}
+.custom-layout .service-details{min-width:0}
+.custom-note{align-self:start;padding:clamp(22px,3vw,36px);background:#fff;border:1px solid #e8e5df}
+.custom-note p{margin:0 0 14px;font-size:clamp(16px,1.6vw,20px);line-height:1.5;letter-spacing:-.02em}
+.custom-note p:last-child{margin-bottom:0}
 .service-card--featured{position:relative;grid-column:1/-1;padding:clamp(30px,4.2vw,56px);background:var(--soft-blue);border:1px solid #cbdde4}
 .service-card--featured .service-top{border-color:#cbdde4}
 .service-card--featured .service-number{color:var(--accent-dark)}
@@ -46,6 +53,8 @@ h1{max-width:1000px;margin:0;font-size:clamp(46px,8vw,104px);font-weight:400;let
 .lead{margin-top:28px}
 .services{grid-template-columns:1fr;gap:14px;margin-top:54px}
 .service-card{padding:25px 22px}
+.service-card--custom{grid-column:auto}
+.custom-layout{grid-template-columns:1fr;gap:22px}
 .service-card--featured{grid-column:auto;padding:26px 22px}
 .featured-layout{grid-template-columns:1fr;gap:22px}
 .service-card h2{font-size:29px}
@@ -126,6 +135,33 @@ h1{max-width:1000px;margin:0;font-size:clamp(46px,8vw,104px);font-weight:400;let
 <div class="service-meta">
 <p><strong>Delivery:</strong> within 14 calendar days of placing the order.</p>
 <p><strong>Ongoing support:</strong> 6 months of online and phone support after the service has been delivered.</p>
+</div>
+</article>
+
+<article class="service-card service-card--custom">
+<div class="service-top">
+<p class="service-number">CUSTOM / TAILORED PROPERTY SERVICES</p>
+<p class="service-price">By agreement</p>
+</div>
+<div class="custom-layout">
+<div class="service-details">
+<h2>Property services tailored to your needs</h2>
+<p class="service-intro">Not every property-related task fits into a standard package. We provide bespoke assistance across Hurghada and the entire Red Sea coast, shaping the scope of work around your specific request.</p>
+<h3>What we can help with</h3>
+<ul>
+<li>Any individual property-related task within our area of expertise in Hurghada and across the Red Sea coast.</li>
+<li>Standalone services or selected elements from any of our packages.</li>
+<li>Custom combinations of services adapted to your objectives and circumstances.</li>
+<li>Specific or unique requests that fall outside the standard packages.</li>
+</ul>
+<div class="service-meta">
+<p><strong>Pricing:</strong> agreed individually and based on the nature, scope and complexity of the task.</p>
+</div>
+</div>
+<aside class="custom-note">
+<p><strong>Your task. A tailored scope of work.</strong></p>
+<p>Tell us what you need. We will discuss the request, define the work involved and propose an individual solution beyond the standard packages.</p>
+</aside>
 </div>
 </article>
 
