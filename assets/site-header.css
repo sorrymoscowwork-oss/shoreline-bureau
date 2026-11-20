@@ -1,4 +1,4 @@
-:root{--ink:#171717;--muted:#77736d;--line:#e8e5df;--accent:#a66b52}
+:root{--ink:#171717;--muted:#77736d;--line:#e8e5df;--accent:#337695}
 #site-header-root{position:relative;z-index:100}
 .site-header{position:fixed!important;top:0;left:0;right:0;width:100%;height:92px;padding:0 clamp(24px,5.2vw,84px);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#fff;z-index:100;box-sizing:border-box}
 .site-header .brand-lockup{display:flex;flex-direction:column;align-items:flex-start;align-content:flex-start;width:max-content;gap:4px}
