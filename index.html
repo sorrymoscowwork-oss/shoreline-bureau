@@ -62,8 +62,12 @@
       const shoreline = document.querySelector('.landing-wordmark .shoreline');
       const bureau = document.querySelector('.landing-wordmark .bureau');
       if (!boat || !blue || !landing || !shoreline || !bureau) return;
+
       let movement, color;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const DURATION = 28000;
+      const OUTBOUND_END = 0.47;
+      const TURN_END = 0.53;
 
       function textBounds(element) {
         const range = document.createRange();
@@ -74,60 +78,74 @@
       function positionBoat() {
         if (movement) movement.cancel();
         if (color) color.cancel();
+
         const area = landing.getBoundingClientRect();
         const shoreText = textBounds(shoreline);
         const bureauText = textBounds(bureau);
         const width = boat.getBoundingClientRect().width;
         const start = Math.max(0, shoreText.left - area.left);
         const finish = Math.max(start, bureauText.right - area.left - width);
-        const split = area.width * .5;
-        const distance = Math.max(1, finish - start);
-        const travelEnd = .47;
-        const turnEnd = .53;
-        const blueReveal = x => Math.max(0, Math.min(100, (x + width - split) / width * 100));
+        const split = area.width / 2;
+        const distance = finish - start;
 
         boat.style.left = start + 'px';
-        if (reducedMotion.matches || finish <= start + 2) {
+        boat.style.transform = 'perspective(700px) rotateY(0deg)';
+
+        if (reducedMotion.matches || distance <= 2) {
           blue.style.clipPath = 'inset(0 100% 0 0)';
           return;
         }
 
-        const outboundXs = [start, split - width, split - width / 2, split, finish]
-          .map(x => Math.max(start, Math.min(finish, x)))
-          .filter((x, i, arr) => i === 0 || x > arr[i - 1] + .01);
-        const returnXs = [...outboundXs].reverse();
+        // The colour edge is calculated from the boat's actual left edge.
+        // Its visible boundary therefore stays exactly on the image/white split.
+        const clipAt = x => Math.max(0, Math.min(100, (split - x) / width * 100));
+        const outboundStart = Math.max(start, Math.min(finish, split - width));
+        const outboundFinish = Math.max(start, Math.min(finish, split));
+        const returnStart = outboundFinish;
+        const returnFinish = outboundStart;
 
-        const moveFrames = [
-          { left: start + 'px', transform: 'rotate(0deg)', offset: 0 },
-          { left: finish + 'px', transform: 'rotate(0deg)', offset: travelEnd },
-          { left: finish + 'px', transform: 'rotate(180deg)', offset: turnEnd, easing: 'ease-in-out' },
-          { left: start + 'px', transform: 'rotate(180deg)', offset: 1 }
+        const movementFrames = [
+          { left: start + 'px', transform: 'perspective(700px) rotateY(0deg)', offset: 0 },
+          { left: finish + 'px', transform: 'perspective(700px) rotateY(0deg)', offset: OUTBOUND_END },
+          { left: finish + 'px', transform: 'perspective(700px) rotateY(180deg)', offset: TURN_END },
+          { left: start + 'px', transform: 'perspective(700px) rotateY(180deg)', offset: 1 }
         ];
 
-        const colorFrames = [];
-        outboundXs.forEach(x => {
-          const pct = blueReveal(x);
-          colorFrames.push({
-            clipPath: 'inset(0 0 0 ' + (100 - pct) + '%)',
-            offset: ((x - start) / distance) * travelEnd
-          });
-        });
-        // At the far end the whole boat is blue. After the turn it returns mirrored:
-        // blue must be revealed from the boat's local left edge (physical right edge).
-        colorFrames.push({ clipPath: 'inset(0 0 0 0%)', offset: travelEnd });
-        colorFrames.push({ clipPath: 'inset(0 0 0 0%)', offset: turnEnd });
-        returnXs.forEach(x => {
-          const pct = blueReveal(x);
-          colorFrames.push({
-            clipPath: 'inset(0 ' + (100 - pct) + '% 0 0)',
-            offset: turnEnd + ((finish - x) / distance) * (1 - turnEnd)
-          });
-        });
-        colorFrames.sort((a,b) => a.offset - b.offset);
+        // Outbound: reveal blue from the boat's right edge as it crosses the split.
+        const outboundFrames = [
+          { clipPath: 'inset(0 0 0 ' + clipAt(start) + '%)', offset: 0 },
+          { clipPath: 'inset(0 0 0 ' + clipAt(outboundStart) + '%)', offset: ((outboundStart - start) / distance) * OUTBOUND_END },
+          { clipPath: 'inset(0 0 0 ' + clipAt(outboundFinish) + '%)', offset: ((outboundFinish - start) / distance) * OUTBOUND_END },
+          { clipPath: 'inset(0 0 0 0%)', offset: OUTBOUND_END },
+          { clipPath: 'inset(0 0 0 0%)', offset: TURN_END }
+        ];
 
-        movement = boat.animate(moveFrames, { duration: 28000, iterations: Infinity, easing: 'linear' });
-        color = blue.animate(colorFrames, { duration: 28000, iterations: Infinity, easing: 'linear' });
+        // After the 180-degree yaw, local left is the boat's physical right.
+        // Reveal that local side on the return so the colour edge remains on the split.
+        const returnFrames = [
+          { clipPath: 'inset(0 0 0 0%)', offset: TURN_END },
+          { clipPath: 'inset(0 ' + (100 - clipAt(returnStart)) + '% 0 0)', offset: TURN_END + ((finish - returnStart) / distance) * (1 - TURN_END) },
+          { clipPath: 'inset(0 ' + (100 - clipAt(returnFinish)) + '% 0 0)', offset: TURN_END + ((finish - returnFinish) / distance) * (1 - TURN_END) },
+          { clipPath: 'inset(0 100% 0 0)', offset: 1 }
+        ];
+
+        const colorFrames = [...outboundFrames, ...returnFrames.slice(1)]
+          .sort((a, b) => a.offset - b.offset);
+
+        // All three phases use a linear clock: constant outbound speed,
+        // constant-speed yaw turn, and the same constant return speed.
+        movement = boat.animate(movementFrames, {
+          duration: DURATION,
+          iterations: Infinity,
+          easing: 'linear'
+        });
+        color = blue.animate(colorFrames, {
+          duration: DURATION,
+          iterations: Infinity,
+          easing: 'linear'
+        });
       }
+
       positionBoat();
       window.addEventListener('resize', () => {
         clearTimeout(window.__shorelineBoatResize);
