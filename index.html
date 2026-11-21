@@ -83,8 +83,10 @@
         const split = area.width * .5;
         const distance = Math.max(1, finish - start);
         const clipAt = x => Math.max(0, Math.min(100, (split - x) / width * 100));
-        const outboundOffset = x => Math.max(0, Math.min(.5, (x - start) / distance * .5));
-        const returnOffset = x => .5 + Math.max(0, Math.min(.5, (finish - x) / distance * .5));
+        const travelEnd = .47;
+        const turnEnd = .53;
+        const outboundOffset = x => Math.max(0, Math.min(travelEnd, (x - start) / distance * travelEnd));
+        const returnOffset = x => turnEnd + Math.max(0, Math.min(1 - turnEnd, (finish - x) / distance * (1 - turnEnd)));
 
         boat.style.left = start + 'px';
         if (reducedMotion.matches || finish <= start + 2) {
@@ -98,13 +100,13 @@
         const returnXs = [...outboundXs].reverse();
         const moveFrames = [
           { left: start + 'px', transform: 'perspective(600px) rotateY(0deg)', offset: 0 },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(0deg)', offset: .5 },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(12deg)', offset: .507, easing: 'ease-in-out' },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(45deg)', offset: .516, easing: 'ease-in-out' },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(90deg)', offset: .527, easing: 'ease-in-out' },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(135deg)', offset: .538, easing: 'ease-in-out' },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(168deg)', offset: .547, easing: 'ease-in-out' },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(180deg)', offset: .554, easing: 'ease-in-out' },
+          { left: finish + 'px', transform: 'perspective(600px) rotateY(0deg)', offset: travelEnd },
+          { left: finish + 'px', transform: 'perspective(600px) rotateY(12deg)', offset: .478, easing: 'ease-in-out' },
+          { left: finish + 'px', transform: 'perspective(600px) rotateY(45deg)', offset: .489, easing: 'ease-in-out' },
+          { left: finish + 'px', transform: 'perspective(600px) rotateY(90deg)', offset: .5, easing: 'ease-in-out' },
+          { left: finish + 'px', transform: 'perspective(600px) rotateY(135deg)', offset: .511, easing: 'ease-in-out' },
+          { left: finish + 'px', transform: 'perspective(600px) rotateY(168deg)', offset: .522, easing: 'ease-in-out' },
+          { left: finish + 'px', transform: 'perspective(600px) rotateY(180deg)', offset: turnEnd, easing: 'ease-in-out' },
           { left: start + 'px', transform: 'perspective(600px) rotateY(180deg)', offset: 1 }
         ];
         const colorFrames = [];
