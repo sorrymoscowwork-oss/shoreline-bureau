@@ -124,8 +124,10 @@
         // Reveal that local side on the return so the colour edge remains on the split.
         const returnFrames = [
           { clipPath: 'inset(0 0 0 0%)', offset: TURN_END },
-          { clipPath: 'inset(0 ' + (100 - clipAt(returnStart)) + '% 0 0)', offset: TURN_END + ((finish - returnStart) / distance) * (1 - TURN_END) },
-          { clipPath: 'inset(0 ' + (100 - clipAt(returnFinish)) + '% 0 0)', offset: TURN_END + ((finish - returnFinish) / distance) * (1 - TURN_END) },
+          // With the boat facing left, its local left edge is the physical right edge.
+          // The right inset must therefore equal clipAt(x), not its inverse.
+          { clipPath: 'inset(0 ' + clipAt(returnStart) + '% 0 0)', offset: TURN_END + ((finish - returnStart) / distance) * (1 - TURN_END) },
+          { clipPath: 'inset(0 ' + clipAt(returnFinish) + '% 0 0)', offset: TURN_END + ((finish - returnFinish) / distance) * (1 - TURN_END) },
           { clipPath: 'inset(0 100% 0 0)', offset: 1 }
         ];
 
