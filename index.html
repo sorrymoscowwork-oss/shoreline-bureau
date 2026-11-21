@@ -36,7 +36,7 @@
       .landing-image img { object-position:48% center; }
       .landing-location { top:calc(23% + clamp(30px,8vw,38px) * .98 + 12px); left:0; width:100%; font-size:clamp(13px,3.8vw,16px); letter-spacing:-.045em; }
       .landing-tagline { top:calc(23% + clamp(30px,8vw,38px) * .98 + 12px + clamp(13px,3.8vw,16px) + 7px); row-gap:4px; font-size:clamp(10px,3vw,13px); letter-spacing:-.045em; }
-      .landing-wordmark { inset:23% 0 auto; grid-template-columns:59% 41%; font-size:clamp(30px,9.7vw,40px); letter-spacing:-.09em; }
+      .landing-wordmark { inset:23% 0 auto; grid-template-columns:50% 50%; font-size:clamp(28px,9vw,38px); letter-spacing:-.09em; }
       .sailing-boat { top:calc(23% - clamp(32px,8.2vw,42px)); width:clamp(46px,12vw,60px); }
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
@@ -49,7 +49,7 @@
       <div class="landing-image"><img src="/assets/shoreline-courtyard.png" alt="Sunlit residential architecture in Hurghada, Egypt"></div>
       <p class="landing-location"><span class="hurghada">HURGHADA</span><span class="red-sea">RED SEA</span></p>
       <p class="landing-tagline"><span class="independent">Independent Property</span><span class="interests">Purchase Advisory</span><span class="independent">Legal &amp; Technical</span><span class="interests">Support</span><span class="independent">20 Years of Local</span><span class="interests">Market Experience</span></p>
-<h1 class="landing-wordmark"><span class="shoreline">SHORELINE</span> <span class="bureau">BUREAU<sup>®</sup></span></h1>
+<h1 class="landing-wordmark"><span class="shoreline">SHORELINE</span> <span class="bureau">BUREAU</span></h1>
       <span class="sailing-boat" aria-hidden="true"></span>
     </section>
   </main>
@@ -80,7 +80,7 @@
         // Use the actual glyph bounds, not the full-width grid cells.
         const start = Math.max(0, shoreText.left - area.left);
         const finish = Math.max(start, bureauText.right - area.left - width);
-        const colorChange = Math.min(finish, Math.max(start, bureauText.left - area.left - width * .35));
+        const colorChange = Math.min(finish, Math.max(start, area.width * .5 - width * .5));
         const outboundDistance = Math.max(1, finish - start);
         const inboundDistance = Math.max(1, finish - start);
         const outboundChange = Math.max(.01, Math.min(.49, (colorChange - start) / outboundDistance * .5));
