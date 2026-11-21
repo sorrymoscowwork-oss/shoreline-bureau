@@ -38,3 +38,47 @@ body{padding-top:92px}
 .menu-panel .menu-links a.active-nav-link{color:var(--accent);font-weight:700}
 .site-header .desktop-nav a[href="/consultation/"].active-nav-link,
 .menu-panel .menu-links a[href="/consultation/"].active-nav-link{background:#28647f;color:#fff;font-weight:700}
+
+
+/* Compact landscape-phone header only — portrait mobile and desktop remain unchanged */
+@media (orientation:landscape) and (max-height:600px) and (max-width:1100px){
+  .site-header{
+    height:72px;
+    padding:0 3.2vw;
+    justify-content:space-between;
+    gap:clamp(10px,1.6vw,20px);
+  }
+  .site-header .brand-lockup{flex:0 0 auto;gap:3px}
+  .site-header .wordmark{font-size:clamp(17px,2.05vw,22px)}
+  .site-header .brand-division{font-size:7px}
+  .site-header .desktop-nav{
+    position:static;
+    left:auto;
+    top:auto;
+    transform:none;
+    flex:1 1 auto;
+    justify-content:center;
+    gap:clamp(12px,1.8vw,22px);
+    min-width:0;
+  }
+  .site-header .desktop-nav a{
+    font-size:clamp(9px,.98vw,11px);
+    letter-spacing:.045em;
+  }
+  .site-header .desktop-nav a[href="/consultation/"]{
+    padding:9px clamp(10px,1.35vw,16px);
+    white-space:nowrap;
+  }
+  .site-header .language-switcher-desktop{
+    flex:0 0 auto;
+    gap:clamp(3px,.55vw,7px);
+    margin:0;
+  }
+  .site-header .language-button{
+    width:clamp(20px,2.3vw,24px);
+    height:clamp(20px,2.3vw,24px);
+    font-size:clamp(14px,1.65vw,17px);
+  }
+  body{padding-top:72px}
+  .menu-panel{inset:72px 0 0}
+}
