@@ -26,7 +26,8 @@
     .landing-wordmark .shoreline { display:block; color:#fff; text-align:right; padding-right:.08em; }
     .landing-wordmark .bureau { display:block; position:relative; color:var(--ink); font-weight:400; text-align:left; padding-left:.08em; padding-right:.38em; }
     .landing-wordmark .bureau sup { position:absolute; top:-.12em; right:0; margin:0; color:var(--ink); font-size:.16em; line-height:1; letter-spacing:0; }
-    .sailing-boat { position:absolute; z-index:3; top:calc(23% - clamp(34px,4.2vw,58px)); left:0; width:clamp(58px,5vw,82px); aspect-ratio:180 / 140; background:#fff; -webkit-mask:url('/assets/sailboat.svg') center / contain no-repeat; mask:url('/assets/sailboat.svg') center / contain no-repeat; pointer-events:none; will-change:left,background-color,transform; }
+    .sailing-boat { position:absolute; z-index:3; top:calc(23% - clamp(34px,4.2vw,58px)); left:0; width:clamp(58px,5vw,82px); aspect-ratio:180 / 140; background:#fff; -webkit-mask:url('/assets/sailboat.svg') center / contain no-repeat; mask:url('/assets/sailboat.svg') center / contain no-repeat; pointer-events:none; will-change:left,transform; }
+    .sailing-boat-blue { position:absolute; inset:0; display:block; background:#337695; clip-path:inset(0 0 0 100%); will-change:clip-path; }
     @media (max-width:600px) { .sailing-boat { top:calc(23% - clamp(24px,6vw,36px)); width:clamp(38px,9vw,52px); } }
     @media (max-width:600px) { .sailing-boat { top:calc(23% - clamp(17px,4.8vw,27px)); width:clamp(23px,6vw,32px); } }
     @media (max-width:600px) {
@@ -50,59 +51,70 @@
       <p class="landing-location"><span class="hurghada">HURGHADA</span><span class="red-sea">RED SEA</span></p>
       <p class="landing-tagline"><span class="independent">Independent Property</span><span class="interests">Purchase Advisory</span><span class="independent">Legal &amp; Technical</span><span class="interests">Support</span><span class="independent">20 Years of Local</span><span class="interests">Market Experience</span></p>
 <h1 class="landing-wordmark"><span class="shoreline">SHORELINE</span> <span class="bureau">BUREAU</span></h1>
-      <span class="sailing-boat" aria-hidden="true"></span>
+      <span class="sailing-boat" aria-hidden="true"><span class="sailing-boat-blue"></span></span>
     </section>
   </main>
   <script>
     (() => {
       const boat = document.querySelector('.sailing-boat');
+      const blue = document.querySelector('.sailing-boat-blue');
       const landing = document.querySelector('.landing');
       const shoreline = document.querySelector('.landing-wordmark .shoreline');
       const bureau = document.querySelector('.landing-wordmark .bureau');
-      if (!boat || !landing || !shoreline || !bureau) return;
-      let animation;
+      if (!boat || !blue || !landing || !shoreline || !bureau) return;
+      let movement, color;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-      function textBounds(element, textNodeOnly = false) {
+      function textBounds(element) {
         const range = document.createRange();
-        if (textNodeOnly && element.firstChild) range.selectNode(element.firstChild);
-        else range.selectNodeContents(element);
+        range.selectNodeContents(element);
         return range.getBoundingClientRect();
       }
 
       function positionBoat() {
-        if (animation) animation.cancel();
+        if (movement) movement.cancel();
+        if (color) color.cancel();
         const area = landing.getBoundingClientRect();
         const shoreText = textBounds(shoreline);
-        const bureauText = textBounds(bureau, true);
+        const bureauText = textBounds(bureau);
         const width = boat.getBoundingClientRect().width;
-
-        // Use the actual glyph bounds, not the full-width grid cells.
         const start = Math.max(0, shoreText.left - area.left);
         const finish = Math.max(start, bureauText.right - area.left - width);
-        const colorChange = Math.min(finish, Math.max(start, area.width * .5 - width * .5));
-        const outboundDistance = Math.max(1, finish - start);
-        const inboundDistance = Math.max(1, finish - start);
-        const outboundChange = Math.max(.01, Math.min(.49, (colorChange - start) / outboundDistance * .5));
-        const returnChange = .5 + Math.max(.01, Math.min(.49, (finish - colorChange) / inboundDistance * .5));
+        const split = area.width * .5;
+        const distance = Math.max(1, finish - start);
+        const clipAt = x => Math.max(0, Math.min(100, (split - x) / width * 100));
+        const outboundOffset = x => Math.max(0, Math.min(.5, (x - start) / distance * .5));
+        const returnOffset = x => .5 + Math.max(0, Math.min(.5, (finish - x) / distance * .5));
 
         boat.style.left = start + 'px';
         if (reducedMotion.matches || finish <= start + 2) {
-          boat.style.backgroundColor = '#fff';
-          boat.style.transform = 'none';
+          blue.style.clipPath = 'inset(0 0 0 100%)';
           return;
         }
 
-        animation = boat.animate([
-          { left: start + 'px', backgroundColor: '#fff', transform: 'scaleX(1)', offset: 0 },
-          { left: colorChange + 'px', backgroundColor: '#fff', transform: 'scaleX(1)', offset: outboundChange },
-          { left: colorChange + 'px', backgroundColor: '#337695', transform: 'scaleX(1)', offset: outboundChange + .002 },
-          { left: finish + 'px', backgroundColor: '#337695', transform: 'scaleX(1)', offset: .5 },
-          { left: finish + 'px', backgroundColor: '#337695', transform: 'scaleX(-1)', offset: .502 },
-          { left: colorChange + 'px', backgroundColor: '#337695', transform: 'scaleX(-1)', offset: returnChange },
-          { left: colorChange + 'px', backgroundColor: '#fff', transform: 'scaleX(-1)', offset: Math.min(.999, returnChange + .002) },
-          { left: start + 'px', backgroundColor: '#fff', transform: 'scaleX(-1)', offset: 1 }
-        ], { duration: 28000, iterations: Infinity, easing: 'linear' });
+        const outboundXs = [start, split - width, split - width / 2, split, finish]
+          .map(x => Math.max(start, Math.min(finish, x)))
+          .filter((x, i, arr) => i === 0 || x > arr[i - 1] + .01);
+        const returnXs = [...outboundXs].reverse();
+        const moveFrames = [
+          { left: start + 'px', transform: 'scaleX(1)', offset: 0 },
+          { left: finish + 'px', transform: 'scaleX(1)', offset: .5 },
+          { left: finish + 'px', transform: 'scaleX(-1)', offset: .502 },
+          { left: start + 'px', transform: 'scaleX(-1)', offset: 1 }
+        ];
+        const colorFrames = [];
+        outboundXs.forEach(x => {
+          const pct = clipAt(x);
+          colorFrames.push({ clipPath: 'inset(0 0 0 ' + pct + '%)', offset: outboundOffset(x) });
+        });
+        returnXs.forEach(x => {
+          const pct = clipAt(x);
+          colorFrames.push({ clipPath: 'inset(0 ' + pct + '% 0 0)', offset: returnOffset(x) });
+        });
+        colorFrames.sort((a,b) => a.offset - b.offset);
+
+        movement = boat.animate(moveFrames, { duration: 28000, iterations: Infinity, easing: 'linear' });
+        color = blue.animate(colorFrames, { duration: 28000, iterations: Infinity, easing: 'linear' });
       }
 
       positionBoat();
