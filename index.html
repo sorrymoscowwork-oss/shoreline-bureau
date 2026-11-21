@@ -84,12 +84,11 @@
         const distance = Math.max(1, finish - start);
         const travelEnd = .47;
         const turnEnd = .53;
-        const clipOut = x => Math.max(0, Math.min(100, (split - x) / width * 100));
-        const clipBack = x => Math.max(0, Math.min(100, (x + width - split) / width * 100));
+        const blueReveal = x => Math.max(0, Math.min(100, (x + width - split) / width * 100));
 
         boat.style.left = start + 'px';
         if (reducedMotion.matches || finish <= start + 2) {
-          blue.style.clipPath = 'inset(0 0 0 100%)';
+          blue.style.clipPath = 'inset(0 100% 0 0)';
           return;
         }
 
@@ -98,39 +97,36 @@
           .filter((x, i, arr) => i === 0 || x > arr[i - 1] + .01);
         const returnXs = [...outboundXs].reverse();
 
-        // One continuous linear timeline for travel; the only eased segment is the 180° turn.
         const moveFrames = [
-          { left: start + 'px', transform: 'perspective(600px) rotateY(0deg)', offset: 0 },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(0deg)', offset: travelEnd },
-          { left: finish + 'px', transform: 'perspective(600px) rotateY(180deg)', offset: turnEnd, easing: 'ease-in-out' },
-          { left: start + 'px', transform: 'perspective(600px) rotateY(180deg)', offset: 1 }
+          { left: start + 'px', transform: 'rotate(0deg)', offset: 0 },
+          { left: finish + 'px', transform: 'rotate(0deg)', offset: travelEnd },
+          { left: finish + 'px', transform: 'rotate(180deg)', offset: turnEnd, easing: 'ease-in-out' },
+          { left: start + 'px', transform: 'rotate(180deg)', offset: 1 }
         ];
 
         const colorFrames = [];
         outboundXs.forEach(x => {
+          const pct = blueReveal(x);
           colorFrames.push({
-            clipPath: 'inset(0 0 0 ' + clipOut(x) + '%)',
+            clipPath: 'inset(0 0 0 ' + (100 - pct) + '%)',
             offset: ((x - start) / distance) * travelEnd
           });
         });
-        // Keep the boat fully blue during the turn, then blend from the opposite side
-        // as the mirrored boat crosses the same fixed photo/white boundary.
+        // At the far end the whole boat is blue. After the turn it returns mirrored:
+        // blue must be revealed from the boat's local left edge (physical right edge).
         colorFrames.push({ clipPath: 'inset(0 0 0 0%)', offset: travelEnd });
         colorFrames.push({ clipPath: 'inset(0 0 0 0%)', offset: turnEnd });
         returnXs.forEach(x => {
+          const pct = blueReveal(x);
           colorFrames.push({
-            clipPath: 'inset(0 ' + clipBack(x) + '% 0 0)',
+            clipPath: 'inset(0 ' + (100 - pct) + '% 0 0)',
             offset: turnEnd + ((finish - x) / distance) * (1 - turnEnd)
           });
         });
         colorFrames.sort((a,b) => a.offset - b.offset);
 
-        movement = boat.animate(moveFrames, {
-          duration: 28000, iterations: Infinity, easing: 'linear'
-        });
-        color = blue.animate(colorFrames, {
-          duration: 28000, iterations: Infinity, easing: 'linear'
-        });
+        movement = boat.animate(moveFrames, { duration: 28000, iterations: Infinity, easing: 'linear' });
+        color = blue.animate(colorFrames, { duration: 28000, iterations: Infinity, easing: 'linear' });
       }
       positionBoat();
       window.addEventListener('resize', () => {
