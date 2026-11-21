@@ -40,9 +40,17 @@
       .landing-wordmark { inset:23% 0 auto; grid-template-columns:50% 50%; font-size:clamp(28px,9vw,38px); letter-spacing:-.09em; }
       .sailing-boat { top:calc(23% - clamp(32px,8.2vw,42px)); width:clamp(46px,12vw,60px); }
     }
+    /* Landscape phones only: lift and scale the boat clear of the wordmark.
+       This breakpoint does not match desktop or portrait-phone layouts. */
+    @media (orientation:landscape) and (max-height:600px) and (max-width:1100px) {
+      .sailing-boat {
+        top:calc(23% - clamp(54px,6.2vw,66px));
+        width:clamp(34px,4.2vw,44px);
+      }
+    }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
   </style>
-<link rel="stylesheet" href="/assets/site-header.css?v=20261120-2"></head>
+<link rel="stylesheet" href="/assets/site-header.css?v=20261121-landscape"></head>
 <body>
   <div id="site-header-root"></div><script src="/assets/site-header.js?v=20261117-9" defer></script>
   <main>
