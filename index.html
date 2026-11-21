@@ -50,7 +50,7 @@
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
   </style>
-<link rel="stylesheet" href="/assets/site-header.css?v=20261121-landscape"></head>
+<link rel="stylesheet" href="/assets/site-header.css?v=20261121-landscape"><link rel="stylesheet" href="/assets/blog.css?v=20261121-test"></head>
 <body>
   <div id="site-header-root"></div><script src="/assets/site-header.js?v=20261117-9" defer></script>
   <main>
@@ -61,6 +61,8 @@
 <h1 class="landing-wordmark"><span class="shoreline">SHORELINE</span> <span class="bureau">BUREAU</span></h1>
       <span class="sailing-boat" aria-hidden="true"><span class="sailing-boat-blue"></span></span>
     </section>
+  
+    <section class="blog-section" aria-labelledby="latest-insights"><div class="blog-heading"><div><p class="blog-kicker">SHORELINE BUREAU / EDITORIAL</p><h2 id="latest-insights">Latest insights</h2></div><a class="blog-all" href="/blog/">View all articles ↗</a></div><div class="blog-grid" data-blog-cards><p class="blog-empty">Loading articles…</p></div></section>
   </main>
   <script>
     (() => {
@@ -166,5 +168,5 @@
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(positionBoat);
     })();
   </script>
-</body>
+<script src="/assets/blog-list.js?v=20261121-test" defer></script></body>
 </html>
