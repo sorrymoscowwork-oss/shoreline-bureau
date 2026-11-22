@@ -49,7 +49,7 @@ ARTICLE_TEMPLATE = """<!doctype html>
 """
 LANGUAGES = ("en", "ru", "de", "zh")
 MODEL = "gemini-2.5-flash-lite"
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
 
 def log(message: str) -> None:
@@ -58,9 +58,8 @@ def log(message: str) -> None:
 
 def gemini_request(prompt: str) -> dict:
     key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not key:
-        raise RuntimeError("GitHub secret GEMINI_API_KEY is not available to this workflow.")
-    payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 30000}}
+    if not key: raise RuntimeError("GitHub secret GEMINI_API_KEY is not available to this workflow.")
+    payload = {"model": MODEL, "input": prompt, "tools": [{"type": "google_search"}]}
     body = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json", "x-goog-api-key": key}
     transient = {429, 500, 502, 503, 504}
@@ -68,29 +67,27 @@ def gemini_request(prompt: str) -> dict:
     for attempt in range(len(retry_delays) + 1):
         req = Request(API_URL, data=body, method="POST", headers=headers)
         try:
-            with urlopen(req, timeout=300) as response:
+            with urlopen(req, timeout=600) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            if not data.get("candidates"):
-                raise RuntimeError("Gemini returned no candidates: " + json.dumps(data.get("promptFeedback", {}))[:1000])
+            if data.get("status") != "completed":
+                raise RuntimeError("Gemini interaction did not complete: " + json.dumps({"status": data.get("status"), "error": data.get("error")}, ensure_ascii=False)[:1200])
             return data
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:1600]
             if exc.code in transient and attempt < len(retry_delays):
                 delay = retry_delays[attempt]
-                log("Gemini HTTP " + str(exc.code) + "; retrying in " + str(delay) + " seconds.")
+                log(f"Gemini Interactions API HTTP {exc.code}; retrying in {delay}s.")
                 time.sleep(delay)
                 continue
-            if exc.code == 429:
-                raise RuntimeError("Gemini free-tier quota/rate limit reached. No paid fallback is configured. " + detail) from exc
-            raise RuntimeError("Gemini GenerateContent API HTTP " + str(exc.code) + ": " + detail) from exc
+            raise RuntimeError(f"Gemini Interactions API HTTP {exc.code}: {detail}") from exc
         except URLError as exc:
             if attempt < len(retry_delays):
                 delay = retry_delays[attempt]
-                log(f"Gemini connection error; retrying in {delay} seconds.")
+                log(f"Gemini connection error; retrying in {delay}s.")
                 time.sleep(delay)
                 continue
             raise RuntimeError("Could not reach Gemini API: " + str(exc.reason)) from exc
-    raise RuntimeError("Gemini request failed after retries.")
+    raise RuntimeError("Gemini interaction failed after retries.")
 
 
 def create_interaction(prompt: str) -> dict:
@@ -99,23 +96,22 @@ def create_interaction(prompt: str) -> dict:
 
 def extract_output(response: dict) -> tuple[str, list[dict]]:
     chunks, citations = [], []
-    candidates = response.get("candidates") or []
-    if candidates:
-        candidate = candidates[0]
-        for part in candidate.get("content", {}).get("parts", []):
-            if part.get("text"): chunks.append(part["text"])
-        grounding = candidate.get("groundingMetadata") or {}
-        for item in grounding.get("groundingChunks", []):
-            web = item.get("web") or {}
-            url = str(web.get("uri") or "").strip()
-            title = str(web.get("title") or "").strip()
-            if url.startswith("https://"): citations.append({"url": url, "title": title or url})
+    for step in response.get("steps", []):
+        if step.get("type") != "model_output": continue
+        for block in step.get("content", []):
+            if block.get("type") != "text": continue
+            if block.get("text"): chunks.append(block["text"])
+            for annotation in block.get("annotations", []):
+                if annotation.get("type") == "url_citation":
+                    url = str(annotation.get("url") or "").strip()
+                    title = str(annotation.get("title") or "").strip()
+                    if url.startswith("https://"): citations.append({"url": url, "title": title or url})
+    if not chunks and response.get("output_text"): chunks.append(response["output_text"])
     return "\n".join(chunks).strip(), citations
 
 
 def candidate_finish_reason(response: dict) -> str:
-    candidates = response.get("candidates") or []
-    return str(candidates[0].get("finishReason", "UNKNOWN")) if candidates else "NO_CANDIDATE"
+    return str(response.get("status", "UNKNOWN"))
 
 
 def parse_json(text: str) -> dict:
