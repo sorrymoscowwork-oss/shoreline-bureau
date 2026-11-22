@@ -512,7 +512,7 @@ numbers, caveats and assessment consistently.
 
 Return only JSON with this schema:
 {{"no_publish":false,"reason":"","slug":"ascii-kebab-case","category":{{"en":"...","ru":"...","de":"...","zh":"..."}},
-"sources":[{{"title":"...","url":"https://..."} }],
+"sources":[{{"title":"...","url":"https://..."}}],
 "lang":{{"en":{{"title":"...","excerpt":"...","sections":[["Heading","Paragraph"]]}},
 "ru":{{"title":"...","excerpt":"...","sections":[["Заголовок","Текст"]]}},
 "de":{{"title":"...","excerpt":"...","sections":[["Überschrift","Text"]]}},
