@@ -159,6 +159,7 @@ def fetch_news_items() -> list[dict]:
                 "tourism", "resort", "property", "real estate", "developer",
                 "flight", "expat", "residency", "infrastructure")
     for feed_name, feed_url in feeds:
+        feed_collected = 0
         request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 SHORELINE-BUREAU/1.0"})
         try:
             with urlopen(request, timeout=12) as response:
@@ -217,11 +218,10 @@ def fetch_news_items() -> list[dict]:
                 "description": description,
                 "article_text": article_text[:6500],
             })
-            if len(collected) >= 12:
+            feed_collected += 1
+            if feed_collected >= 8:
                 break
-        log(f"RSS {feed_name}: collected {len(collected)} candidate(s) so far.")
-        if len(collected) >= 12:
-            break
+        log(f"RSS {feed_name}: collected {feed_collected} candidate(s); {len(collected)} total so far.")
     selected, domains = [], set()
     for item in collected:
         if item["domain"] not in domains:
