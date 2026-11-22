@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import html
 import os
 import re
 import subprocess
@@ -279,12 +280,28 @@ def main() -> int:
         old_urls = {s.get("url") for s in old.get("sources", [])}
         if source_urls & old_urls:
             raise RuntimeError(f"Duplicate source story detected; overlaps existing article {old.get('slug')}.")
+    # article.js renders these fields into innerHTML. Escape generated text and
+    # source attributes before storing them to prevent model output becoming markup.
+    safe_lang = {}
+    for language in LANGUAGES:
+        content = article["lang"][language]
+        safe_lang[language] = {
+            "title": html.escape(content["title"], quote=False),
+            "excerpt": html.escape(content["excerpt"], quote=False),
+            "sections": [
+                [html.escape(section[0], quote=False), html.escape(section[1], quote=False)]
+                for section in content["sections"]
+            ],
+        }
     article_record = {
         "slug": slug,
         "date": today,
-        "category": article["category"],
-        "sources": sources,
-        "lang": article["lang"],
+        "category": {language: html.escape(article["category"][language], quote=False) for language in LANGUAGES},
+        "sources": [
+            {"label": html.escape(source["label"], quote=False), "url": html.escape(source["url"], quote=True)}
+            for source in sources
+        ],
+        "lang": safe_lang,
     }
     updated = dict(existing)
     updated["updated"] = today
