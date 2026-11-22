@@ -228,7 +228,6 @@ def fetch_news_items() -> list[dict]:
         ("Egyptian Streets", "https://egyptianstreets.com/feed/"),
         ("Al-Masry Al-Youm", "https://www.almasryalyoum.com/rss/rss"),
         ("Al-Shorouk", "https://www.shorouknews.com/rss.aspx"),
-        ("Ahram Online", "https://english.ahram.org.eg/NewsContent/1/64/All.aspx?"),
         ("Cairo 24", "https://www.cairo24.com/rss"),
         ("Sada El Balad", "https://www.elbalad.news/rss"),
     ]
@@ -251,7 +250,7 @@ def fetch_news_items() -> list[dict]:
                       summary_html: str, feed_name: str) -> bool:
         if not headline or not link:
             return False
-        summary = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
+        summary = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
         try:
             published_at = parsedate_to_datetime(pub_date).timestamp()
         except Exception:
@@ -333,9 +332,9 @@ def fetch_news_items() -> list[dict]:
             with urlopen(request, timeout=15) as response:
                 raw = response.read(900000).decode("utf-8", errors="replace")
             # Collect canonical article links and titles from ordinary HTML anchors.
-            for match in re.finditer(r'<a[^>]+href=["\\'](https://hurghada\\.news/article/[^"\\']+)["\\'][^>]*>(.*?)</a>', raw, re.I | re.S):
+            for match in re.finditer(r"""<a[^>]+href=['"](https://hurghada\.news/article/[^'"]+)['"][^>]*>(.*?)</a>""", raw, re.I | re.S):
                 link = html.unescape(match.group(1))
-                headline = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", match.group(2)))).strip()
+        summary = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
                 if not headline:
                     continue
                 # Article pages carry their own publication date; use page metadata when
@@ -344,16 +343,16 @@ def fetch_news_items() -> list[dict]:
                 if not article:
                     continue
                 article_raw = article["text"]
-                date_match = re.search(r'"datePublished"\\s*:\\s*"([^"]+)"', raw)
+                    date_match = re.search(r'"datePublished"\s*:\s*"([^"]+)"', detail_html)
                 pub_date = date_match.group(1) if date_match else ""
                 if not pub_date:
                     # Extract date from article page metadata, not the category listing.
                     detail_request = Request(link, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
                     with urlopen(detail_request, timeout=12) as detail_response:
                         detail_html = detail_response.read(900000).decode("utf-8", errors="replace")
-                    date_match = re.search(r'"datePublished"\\s*:\\s*"([^"]+)"', detail_html)
+                    date_match = re.search(r'"datePublished"\s*:\s*"([^"]+)"', detail_html)
                     if not date_match:
-                        date_match = re.search(r'<time[^>]+datetime=["\\']([^"\\']+)', detail_html, re.I)
+                        date_match = re.search(r"""<time[^>]+datetime=['"]([^'"]+)""", detail_html, re.I)
                     pub_date = date_match.group(1) if date_match else ""
                 if add_candidate(headline or article["title"], link, pub_date, publisher, article_raw, publisher):
                     page_count += 1
