@@ -1,6 +1,10 @@
 name: SHORELINE Editorial News
 
 on:
+  push:
+    paths:
+      - 'scripts/publish_news.py'
+      - '.github/workflows/editorial-news.yml'
   schedule:
     - cron: "0 10 * * 3,6"
       timezone: "Africa/Cairo"
