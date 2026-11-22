@@ -104,6 +104,16 @@ def extract_output(response: dict) -> tuple[str, list[dict]]:
     return "\n".join(chunks).strip(), []
 
 
+def parse_json(text: str) -> dict:
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise RuntimeError("Gemini did not return a JSON article.")
+    try:
+        return json.loads(text[start:end + 1])
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Gemini returned invalid article JSON: " + str(exc)) from exc
+
+
 def fetch_article_page(url: str) -> dict | None:
     """Fetch readable public article text using only Python standard library."""
     request = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU-NewsBot/1.0)"})
