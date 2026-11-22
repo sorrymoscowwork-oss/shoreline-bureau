@@ -125,34 +125,71 @@ def parse_json(text: str) -> dict:
     return value
 
 
+def article_quality_error(article: dict) -> str | None:
+    if article.get("no_publish"):
+        return None
+    if not isinstance(article.get("category"), dict) or not isinstance(article.get("lang"), dict):
+        return "Missing category or language data."
+    for language in LANGUAGES:
+        content = article["lang"].get(language)
+        if not article["category"].get(language) or not isinstance(content, dict):
+            return f"Missing {language} category or article."
+        if not content.get("title") or not content.get("excerpt"):
+            return f"Missing {language} title or excerpt."
+        sections = content.get("sections")
+        if not isinstance(sections, list) or not 5 <= len(sections) <= 7:
+            return f"{language} article must contain 5–7 sections."
+        if any(not isinstance(section, list) or len(section) != 2 or
+               not all(str(part).strip() for part in section) for section in sections):
+            return f"Malformed section in {language} article."
+    english_words = sum(
+        len(re.findall(r"\\b[\\w’'-]+\\b", paragraph))
+        for _, paragraph in article["lang"]["en"]["sections"]
+    )
+    if english_words < 800:
+        return f"English article is too short ({english_words} words; minimum 800)."
+    return None
+
+
 def generate_article(prompt: str) -> dict:
-    # One bounded repair attempt handles malformed/truncated model output without
-    # adding paid services or an unbounded generation loop.
+    # Keep the complete original brief in context for the repair attempt. A repair
+    # must correct both syntax and content completeness, not merely produce parseable JSON.
+    previous_output = ""
+    last_error = ""
     for attempt in range(2):
-        response = create_interaction(prompt)
+        request_prompt = prompt
+        if attempt == 1:
+            request_prompt = (
+                prompt
+                + "\\n\\nREPAIR REQUIREMENT: Your previous response failed validation. "
+                + last_error
+                + " Return a complete replacement JSON object, not a patch. "
+                + "The English article MUST contain at least 800 words in its section paragraphs; "
+                + "write 850–1,100 words. Each of en, ru, de, zh MUST contain 5–7 complete "
+                + "sections with full translated article text. Do not shorten translations. "
+                + "Preserve source IDs and factual caveats. Return only valid JSON, with no fences. "
+                + "\\n\\nPREVIOUS RESPONSE (for correction only):\\n"
+                + previous_output[:24000]
+            )
+        response = create_interaction(request_prompt)
         output, _ = extract_output(response)
+        previous_output = output
         finish_reason = candidate_finish_reason(response)
         if not output:
-            error = f"Gemini returned no text (finishReason={finish_reason})."
+            last_error = f"Gemini returned no text (finishReason={finish_reason})."
         else:
             try:
-                return parse_json(output)
+                article = parse_json(output)
+                last_error = article_quality_error(article) or ""
+                if not last_error:
+                    return article
             except RuntimeError as exc:
-                error = f"{exc} (finishReason={finish_reason})"
+                last_error = str(exc)
         if attempt == 0:
-            log(f"{error} Requesting one JSON repair attempt.")
-            prompt = (
-                "Your previous response was not valid complete JSON. Correct it and return "
-                "ONLY one complete JSON object matching the exact schema and requirements "
-                "in the original request. Do not use Markdown fences or commentary. "
-                "Preserve all facts, source IDs, caveats and all four language versions. "
-                "If the full article cannot be completed reliably, return "
-                '{"no_publish":true,"reason":"Unable to produce a complete validated article."}.'
-                "\\n\\nPREVIOUS RESPONSE TO REPAIR:\\n" + output[:24000]
-            )
+            log(f"{last_error} (finishReason={finish_reason}) Requesting one complete repair attempt.")
         else:
-            raise RuntimeError(f"Gemini JSON generation failed after one repair attempt: {error}")
-    raise RuntimeError("Gemini JSON generation failed.")
+            raise RuntimeError(f"Gemini article failed after one repair attempt: {last_error} (finishReason={finish_reason})")
+    raise RuntimeError("Gemini article generation failed.")
 
 
 def fetch_article_page(url: str) -> dict | None:
