@@ -62,25 +62,35 @@ def gemini_request(prompt: str) -> dict:
     if not key:
         raise RuntimeError("GitHub secret GEMINI_API_KEY is not available to this workflow.")
     payload = {"model": MODEL, "input": prompt}
-    req = Request(
-        API_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers={"Content-Type": "application/json", "x-goog-api-key": key},
-    )
-    try:
-        with urlopen(req, timeout=300) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[:1600]
-        if exc.code == 429:
-            raise RuntimeError("Gemini free-tier quota/rate limit reached (HTTP 429). No paid fallback is configured; nothing was published. " + detail) from exc
-        raise RuntimeError(f"Gemini Interactions API returned HTTP {exc.code}: {detail}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"Could not reach Gemini API: {exc.reason}") from exc
-    if data.get("status") not in (None, "completed"):
-        raise RuntimeError(f"Gemini interaction did not complete: {data.get('status')}")
-    return data
+    body = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json", "x-goog-api-key": key}
+    transient = {429, 500, 502, 503, 504}
+    for attempt in range(3):
+        req = Request(API_URL, data=body, method="POST", headers=headers)
+        try:
+            with urlopen(req, timeout=300) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            if data.get("status") not in (None, "completed"):
+                raise RuntimeError(f"Gemini interaction did not complete: {data.get('status')}")
+            return data
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:1600]
+            if exc.code in transient and attempt < 2:
+                delay = (20, 45)[attempt]
+                log(f"Gemini returned HTTP {exc.code}; retrying in {delay}s (attempt {attempt + 2}/3).")
+                time.sleep(delay)
+                continue
+            if exc.code == 429:
+                raise RuntimeError("Gemini free-tier quota/rate limit reached (HTTP 429). No paid fallback is configured; nothing was published. " + detail) from exc
+            raise RuntimeError(f"Gemini Interactions API returned HTTP {exc.code}: {detail}") from exc
+        except URLError as exc:
+            if attempt < 2:
+                delay = (20, 45)[attempt]
+                log(f"Gemini connection failed; retrying in {delay}s (attempt {attempt + 2}/3).")
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"Could not reach Gemini API: {exc.reason}") from exc
+    raise RuntimeError("Gemini request failed after retries.")
 
 
 def create_interaction(prompt: str) -> dict:
@@ -324,7 +334,7 @@ def validate_article(data: dict, sources: list[dict]) -> None:
     if data.get("no_publish"):
         raise NoPublish(data.get("reason", "No verified news selected."))
     if len(sources) < 2:
-        raise RuntimeError("Fewer than two verifiable Google Search citations were returned; refusing to publish.")
+        raise RuntimeError("Fewer than two independent publisher RSS sources were selected; refusing to publish.")
     if not isinstance(data.get("category"), dict) or not isinstance(data.get("lang"), dict):
         raise RuntimeError("Article is missing category or language data.")
     for language in LANGUAGES:
