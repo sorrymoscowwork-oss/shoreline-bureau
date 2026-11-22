@@ -64,7 +64,8 @@ def gemini_request(prompt: str) -> dict:
     body = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json", "x-goog-api-key": key}
     transient = {429, 500, 502, 503, 504}
-    for attempt in range(3):
+    retry_delays = (30, 60, 120, 180)
+    for attempt in range(len(retry_delays) + 1):
         req = Request(API_URL, data=body, method="POST", headers=headers)
         try:
             with urlopen(req, timeout=300) as response:
@@ -74,8 +75,8 @@ def gemini_request(prompt: str) -> dict:
             return data
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:1600]
-            if exc.code in transient and attempt < 2:
-                delay = (20, 45)[attempt]
+            if exc.code in transient and attempt < len(retry_delays):
+                delay = retry_delays[attempt]
                 log("Gemini HTTP " + str(exc.code) + "; retrying in " + str(delay) + " seconds.")
                 time.sleep(delay)
                 continue
@@ -83,8 +84,10 @@ def gemini_request(prompt: str) -> dict:
                 raise RuntimeError("Gemini free-tier quota/rate limit reached. No paid fallback is configured. " + detail) from exc
             raise RuntimeError("Gemini GenerateContent API HTTP " + str(exc.code) + ": " + detail) from exc
         except URLError as exc:
-            if attempt < 2:
-                time.sleep((20, 45)[attempt])
+            if attempt < len(retry_delays):
+                delay = retry_delays[attempt]
+                log(f"Gemini connection error; retrying in {delay} seconds.")
+                time.sleep(delay)
                 continue
             raise RuntimeError("Could not reach Gemini API: " + str(exc.reason)) from exc
     raise RuntimeError("Gemini request failed after retries.")
