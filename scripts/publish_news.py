@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SHORELINE BUREAU editorial publisher.
 
-Uses Gemini Interactions API with Google Search grounding, validates a multilingual
+Uses public RSS research and the free-tier Gemini Interactions API, validates a multilingual
 article against the existing blog schema, then commits the article to the repo.
 No external Python packages are required.
 """
@@ -320,8 +320,8 @@ def validate_article(data: dict, sources: list[dict]) -> None:
             if not isinstance(section, list) or len(section) != 2 or not all(str(x).strip() for x in section):
                 raise RuntimeError(f"Malformed section in {language} article.")
     english_words = sum(len(re.findall(r"\b[\w’'-]+\b", p)) for _, p in data["lang"]["en"]["sections"])
-    if english_words < 700:
-        raise RuntimeError(f"English article is too short ({english_words} words; minimum 700).")
+    if english_words < 800:
+        raise RuntimeError(f"English article is too short ({english_words} words; minimum 800).")
 
 
 class NoPublish(Exception):
