@@ -18,10 +18,10 @@ import time
 import unicodedata
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, quote, urlencode
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
@@ -258,7 +258,10 @@ def fetch_news_items() -> list[dict]:
         published_at = None
         if pub_date:
             try:
-                published_at = parsedate_to_datetime(pub_date).timestamp()
+                if re.fullmatch(r"\\d{8}T\\d{6}Z", pub_date):
+                    published_at = datetime.strptime(pub_date, "%Y%m%dT%H%M%SZ").replace(tzinfo=ZoneInfo("UTC")).timestamp()
+                else:
+                    published_at = parsedate_to_datetime(pub_date).timestamp()
             except Exception:
                 try:
                     published_at = datetime.fromisoformat(pub_date.replace("Z", "+00:00")).timestamp()
@@ -330,6 +333,46 @@ def fetch_news_items() -> list[dict]:
             log(f"RSS {feed_name}: {feed_collected} regional candidate(s); {len(collected)} total.")
         except Exception as exc:
             log(f"RSS {feed_name}: unavailable or invalid feed ({type(exc).__name__}: {str(exc)[:180]}).")
+
+    # GDELT DOC 2.0 is a free global news index. Search broadly across publishers,
+    # including pages surfaced from public social platforms, but anchor every query
+    # to Hurghada and its immediate neighbouring areas in Egypt.
+    gdelt_queries = [
+        '"Hurghada" OR "الغردقة"',
+        '"El Gouna" OR "الجونة" OR "Sahl Hasheesh" OR "سهل حشيش"',
+        '"Makadi Bay" OR "Makadi" OR "مكادي" OR "Soma Bay" OR "سوما باي"',
+        '"Safaga" OR "سفاجا" OR "El Ahyaa" OR "الاحياء"',
+        '("Hurghada" OR "الغردقة") AND (tourism OR hotel OR resort OR property OR real estate OR investment OR airport OR flight OR road OR infrastructure OR environment OR prices OR residents OR expats)',
+    ]
+    for query in gdelt_queries:
+        params = {
+            "query": query,
+            "mode": "ArtList",
+            "format": "json",
+            "maxrecords": "50",
+            "sort": "datedesc",
+            "startdatetime": datetime.now(ZoneInfo("UTC")).strftime("%Y%m%d") + "000000",
+            "enddatetime": datetime.now(ZoneInfo("UTC")).strftime("%Y%m%d") + "235959",
+        }
+        # Search the full 30-day window, not only today's date.
+        params["startdatetime"] = (datetime.now(ZoneInfo("UTC")) - timedelta(days=30)).strftime("%Y%m%d") + "000000"
+        endpoint = "https://api.gdeltproject.org/api/v2/doc/doc?" + urlencode(params)
+        request = Request(endpoint, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
+        found = 0
+        try:
+            with urlopen(request, timeout=25) as response:
+                payload = json.loads(response.read().decode("utf-8", errors="replace"))
+            articles = payload.get("articles", []) if isinstance(payload, dict) else []
+            for item in articles:
+                headline = str(item.get("title") or "").strip()
+                link = str(item.get("url") or "").strip()
+                date_value = str(item.get("seendate") or "").strip()
+                domain = str(item.get("domain") or "").strip()
+                if add_candidate(headline, link, date_value, domain, headline, "GDELT"):
+                    found += 1
+            log(f"GDELT query [{query[:75]}]: {len(articles)} indexed result(s), {found} usable Hurghada candidate(s).")
+        except Exception as exc:
+            log(f"GDELT query [{query[:75]}]: unavailable ({type(exc).__name__}: {str(exc)[:180]}).")
 
     # Local Hurghada publisher feeds (WordPress-style RSS endpoints).
     for feed_name, feed_url in [
