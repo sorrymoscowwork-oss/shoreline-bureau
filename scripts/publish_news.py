@@ -48,7 +48,7 @@ ARTICLE_TEMPLATE = """<!doctype html>
 </html>
 """
 LANGUAGES = ("en", "ru", "de", "zh")
-MODEL = "gemini-2.5-flash-lite"
+MODEL = "gemini-3.5-flash-lite"
 API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
 
