@@ -221,19 +221,16 @@ def fetch_article_page(url: str) -> dict | None:
 
 
 def fetch_news_items() -> list[dict]:
-    """Collect recent Red Sea/Egypt news from public publisher RSS and Google News RSS."""
-    google_base = "https://news.google.com/rss/search?q="
+    """Collect recent Red Sea news from publisher RSS/Atom feeds and a local-news sitemap."""
     feeds = [
         ("Egypt Independent", "https://www.egyptindependent.com/feed/"),
         ("Daily News Egypt", "https://dailynewsegypt.com/feed/"),
         ("Egyptian Streets", "https://egyptianstreets.com/feed/"),
-        ("Youm7 Governorates (Arabic)", "https://www.youm7.com/rss/SectionRss?SectionID=296"),
-        ("Google News: North Red Sea coast", google_base + quote('("Hurghada" OR "El Gouna" OR "Sahl Hasheesh" OR "Makadi Bay") Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
-        ("Google News: Central Red Sea coast", google_base + quote('("Soma Bay" OR "Safaga" OR "El Quseir" OR "Quseir") Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
-        ("Google News: South Red Sea coast", google_base + quote('("Marsa Alam" OR "Port Ghalib" OR "Shalateen" OR "Halayeb") Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
-        ("Google News: Red Sea Governorate infrastructure", google_base + quote('"Red Sea Governorate" OR "Red Sea governor" Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
-        ("Google News: Red Sea Arabic", google_base + quote('(الغردقة OR "البحر الأحمر" OR سفاجا OR القصير OR "مرسى علم" OR الجونة) when:30d') + "&hl=ar&gl=EG&ceid=EG:ar"),
-        ("Google News: Red Sea Arabic south", google_base + quote('("رأس غارب" OR "الشلاتين" OR "حلايب" OR "سهل حشيش" OR "مكادي") when:30d') + "&hl=ar&gl=EG&ceid=EG:ar"),
+        ("Al-Masry Al-Youm", "https://www.almasryalyoum.com/rss/rss"),
+        ("Al-Shorouk", "https://www.shorouknews.com/rss.aspx"),
+        ("Ahram Online", "https://english.ahram.org.eg/NewsContent/1/64/All.aspx?"),
+        ("Cairo 24", "https://www.cairo24.com/rss"),
+        ("Sada El Balad", "https://www.elbalad.news/rss"),
     ]
     cutoff = datetime.now(ZoneInfo("UTC")).timestamp() - 30 * 86400
     collected, seen = [], set()
@@ -246,79 +243,136 @@ def fetch_news_items() -> list[dict]:
         "shalateen", "الشلاتين", "halayeb", "حلايب", "zafarana", "الزعفرانة",
         "red sea coast", "coastal governorate"
     )
+
+    def local_name(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1].lower()
+
+    def add_candidate(headline: str, link: str, pub_date: str, publisher: str,
+                      summary_html: str, feed_name: str) -> bool:
+        if not headline or not link:
+            return False
+        summary = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
+        try:
+            published_at = parsedate_to_datetime(pub_date).timestamp()
+        except Exception:
+            try:
+                published_at = datetime.fromisoformat(pub_date.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                return False
+        if published_at < cutoff:
+            return False
+        searchable = (headline + " " + summary).lower()
+        if not any(term in searchable for term in relevant):
+            return False
+        page = fetch_article_page(link)
+        page_text = page["text"] if page else ""
+        article_text = page_text if len(page_text) >= 450 else summary
+        if len(article_text) < 250:
+            return False
+        final_url = page["url"] if page else link
+        parsed = urlparse(final_url)
+        if parsed.scheme != "https" or not parsed.netloc:
+            return False
+        domain = parsed.netloc.lower().removeprefix("www.")
+        canonical = f"https://{domain}{parsed.path}".rstrip("/")
+        if canonical in seen:
+            return False
+        seen.add(canonical)
+        collected.append({
+            "id": f"N{len(collected)+1}",
+            "title": (page["title"] if page and page["title"] else headline)[:300],
+            "publisher": publisher or feed_name or domain,
+            "domain": domain,
+            "published": pub_date,
+            "url": final_url,
+            "description": (page["description"] if page else summary[:600]),
+            "article_text": article_text[:6500],
+        })
+        return True
+
     for feed_name, feed_url in feeds:
         feed_collected = 0
-        request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 SHORELINE-BUREAU/1.0"})
+        request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)", "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"})
         try:
-            with urlopen(request, timeout=12) as response:
+            with urlopen(request, timeout=15) as response:
                 root = ET.fromstring(response.read())
+            nodes = [node for node in root.iter() if local_name(node.tag) in ("item", "entry")]
+            for node in nodes:
+                fields = {local_name(child.tag): child for child in list(node)}
+                headline = (fields.get("title").text or "").strip() if fields.get("title") is not None else ""
+                link_node = fields.get("link")
+                link = ""
+                if link_node is not None:
+                    link = (link_node.attrib.get("href") or link_node.text or "").strip()
+                date_node = fields.get("pubdate") or fields.get("published") or fields.get("updated") or fields.get("date")
+                pub_date = (date_node.text or "").strip() if date_node is not None else ""
+                desc_node = fields.get("encoded") or fields.get("description") or fields.get("summary") or fields.get("content")
+                summary = (desc_node.text or "") if desc_node is not None else ""
+                source_node = fields.get("source")
+                publisher = (source_node.text or "").strip() if source_node is not None else feed_name
+                if add_candidate(headline, link, pub_date, publisher, summary, feed_name):
+                    feed_collected += 1
+                if feed_collected >= 15:
+                    break
+            log(f"RSS {feed_name}: {feed_collected} regional candidate(s); {len(collected)} total.")
         except Exception as exc:
-            log(f"RSS feed unavailable ({feed_name}): {exc}")
-            continue
-        for node in root.findall("./channel/item"):
-            headline = (node.findtext("title") or "").strip()
-            link = (node.findtext("link") or "").strip()
-            pub_date = (node.findtext("pubDate") or "").strip()
-            source_node = node.find("source")
-            publisher = ((source_node.text or "").strip() if source_node is not None else feed_name)
-            raw_summary = node.findtext("description") or ""
-            encoded = node.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") or ""
-            summary_html = encoded if len(encoded) > len(raw_summary) else raw_summary
-            summary = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
-            if not headline or not link:
-                continue
-            try:
-                if parsedate_to_datetime(pub_date).timestamp() < cutoff:
+            log(f"RSS {feed_name}: unavailable or invalid feed ({type(exc).__name__}: {str(exc)[:180]}).")
+
+    # Local outlet has current, geographically focused reporting; discover article URLs
+    # from its public category page even if it does not expose a working RSS feed.
+    local_pages = [
+        ("Hurghada News", "https://hurghada.news/category/news"),
+        ("Hurghada News", "https://hurghada.news/category/business"),
+        ("Hurghada News", "https://hurghada.news/category/environment"),
+        ("Hurghada News", "https://hurghada.news/category/real-estate"),
+    ]
+    for publisher, page_url in local_pages:
+        page_count = 0
+        try:
+            request = Request(page_url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
+            with urlopen(request, timeout=15) as response:
+                raw = response.read(900000).decode("utf-8", errors="replace")
+            # Collect canonical article links and titles from ordinary HTML anchors.
+            for match in re.finditer(r'<a[^>]+href=["\\'](https://hurghada\\.news/article/[^"\\']+)["\\'][^>]*>(.*?)</a>', raw, re.I | re.S):
+                link = html.unescape(match.group(1))
+                headline = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", match.group(2)))).strip()
+                if not headline:
                     continue
-            except Exception:
-                continue
-            page = fetch_article_page(link)
-            page_text = page["text"] if page else ""
-            article_text = page_text if len(page_text) >= 450 else summary
-            if len(article_text) < 450:
-                continue
-            searchable = (headline + " " + summary + " " + article_text[:2500]).lower()
-            if not any(term in searchable for term in relevant):
-                continue
-            if page:
-                final_url = page["url"]
-                actual_title = page["title"] or headline
-                description = page["description"] or summary[:600]
-            else:
-                final_url = link
-                actual_title = headline
-                description = summary[:600]
-            parsed = urlparse(final_url)
-            if parsed.scheme != "https" or not parsed.netloc:
-                continue
-            domain = parsed.netloc.lower().removeprefix("www.")
-            canonical = f"https://{domain}{parsed.path}".rstrip("/")
-            if canonical in seen:
-                continue
-            seen.add(canonical)
-            collected.append({
-                "id": f"N{len(collected)+1}",
-                "title": actual_title[:300],
-                "publisher": publisher or domain,
-                "domain": domain,
-                "published": pub_date,
-                "url": final_url,
-                "description": description,
-                "article_text": article_text[:6500],
-            })
-            feed_collected += 1
-            if feed_collected >= 12:
-                break
-        log(f"RSS {feed_name}: collected {feed_collected} candidate(s); {len(collected)} total so far.")
+                # Article pages carry their own publication date; use page metadata when
+                # available rather than assigning the crawl date to old stories.
+                article = fetch_article_page(link)
+                if not article:
+                    continue
+                article_raw = article["text"]
+                date_match = re.search(r'"datePublished"\\s*:\\s*"([^"]+)"', raw)
+                pub_date = date_match.group(1) if date_match else ""
+                if not pub_date:
+                    # Extract date from article page metadata, not the category listing.
+                    detail_request = Request(link, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
+                    with urlopen(detail_request, timeout=12) as detail_response:
+                        detail_html = detail_response.read(900000).decode("utf-8", errors="replace")
+                    date_match = re.search(r'"datePublished"\\s*:\\s*"([^"]+)"', detail_html)
+                    if not date_match:
+                        date_match = re.search(r'<time[^>]+datetime=["\\']([^"\\']+)', detail_html, re.I)
+                    pub_date = date_match.group(1) if date_match else ""
+                if add_candidate(headline or article["title"], link, pub_date, publisher, article_raw, publisher):
+                    page_count += 1
+                if page_count >= 12:
+                    break
+            log(f"Local listing {page_url}: {page_count} regional candidate(s); {len(collected)} total.")
+        except Exception as exc:
+            log(f"Local listing {page_url}: unavailable ({type(exc).__name__}: {str(exc)[:180]}).")
+
     selected, domains = [], set()
     for item in collected:
         if item["domain"] not in domains:
             selected.append(item)
             domains.add(item["domain"])
     for item in collected:
-        if item not in selected and len(selected) < 20:
+        if item not in selected and len(selected) < 25:
             selected.append(item)
-    return selected[:20]
+    log(f"Regional discovery complete: {len(collected)} unique candidate(s), {len(selected)} sent to Gemini.")
+    return selected[:25]
 
 
 def article_prompt(existing: dict, today: str, news_items: list[dict]) -> str:
