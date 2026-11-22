@@ -46,8 +46,8 @@ ARTICLE_TEMPLATE = """<!doctype html>
 </html>
 """
 LANGUAGES = ("en", "ru", "de", "zh")
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-MODEL = "gemini-2.5-flash"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+MODEL = "gemini-3.8-flash"
 
 
 def log(message: str) -> None:
@@ -55,22 +55,11 @@ def log(message: str) -> None:
 
 
 def gemini_request(prompt: str) -> dict:
-    """One free-tier Gemini 2.5 Flash request with Google Search grounding.
-
-    No paid fallback is configured. If free quota is unavailable, the run stops.
-    """
+    """Gemini 3.8 Flash via the free-tier Interactions API. No paid fallback."""
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("GitHub secret GEMINI_API_KEY is not available to this workflow.")
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}],
-        "generationConfig": {
-            "temperature": 0.35,
-            "responseMimeType": "application/json",
-            "maxOutputTokens": 30000
-        }
-    }
+    payload = {"model": MODEL, "input": prompt}
     req = Request(
         API_URL,
         data=json.dumps(payload).encode("utf-8"),
@@ -78,19 +67,18 @@ def gemini_request(prompt: str) -> dict:
         headers={"Content-Type": "application/json", "x-goog-api-key": key},
     )
     try:
-        with urlopen(req, timeout=240) as response:
-            return json.loads(response.read().decode("utf-8"))
+        with urlopen(req, timeout=300) as response:
+            data = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:1600]
         if exc.code == 429:
-            raise RuntimeError(
-                "Gemini free-tier quota/rate limit reached (HTTP 429). "
-                "No paid fallback is configured; nothing was published. "
-                f"Google response: {detail}"
-            ) from exc
-        raise RuntimeError(f"Gemini API returned HTTP {exc.code}: {detail}") from exc
+            raise RuntimeError("Gemini free-tier quota/rate limit reached (HTTP 429). No paid fallback is configured; nothing was published. " + detail) from exc
+        raise RuntimeError(f"Gemini Interactions API returned HTTP {exc.code}: {detail}") from exc
     except URLError as exc:
         raise RuntimeError(f"Could not reach Gemini API: {exc.reason}") from exc
+    if data.get("status") not in (None, "completed"):
+        raise RuntimeError(f"Gemini interaction did not complete: {data.get('status')}")
+    return data
 
 
 def create_interaction(prompt: str) -> dict:
@@ -98,23 +86,15 @@ def create_interaction(prompt: str) -> dict:
 
 
 def extract_output(response: dict) -> tuple[str, list[dict]]:
-    candidates = response.get("candidates") or []
-    if not candidates:
-        block = response.get("promptFeedback", {})
-        raise RuntimeError(f"Gemini returned no candidate: {json.dumps(block, ensure_ascii=False)[:1000]}")
-    candidate = candidates[0]
+    if response.get("output_text"):
+        return response["output_text"].strip(), []
     chunks = []
-    for part in candidate.get("content", {}).get("parts", []):
-        if part.get("text"):
-            chunks.append(part["text"])
-    citations = []
-    grounding = candidate.get("groundingMetadata", {})
-    for chunk in grounding.get("groundingChunks", []):
-        web = chunk.get("web", {})
-        url = web.get("uri")
-        if url:
-            citations.append({"url": url, "title": web.get("title") or ""})
-    return "\n".join(chunks).strip(), citations
+    for step in response.get("steps", []):
+        if step.get("type") == "model_output":
+            for part in step.get("content", []):
+                if part.get("type") == "text" and part.get("text"):
+                    chunks.append(part["text"])
+    return "\n".join(chunks).strip(), []
 
 
 def parse_json(text: str) -> dict:
