@@ -104,14 +104,55 @@ def extract_output(response: dict) -> tuple[str, list[dict]]:
     return "\n".join(chunks).strip(), []
 
 
+def candidate_finish_reason(response: dict) -> str:
+    candidates = response.get("candidates") or []
+    return str(candidates[0].get("finishReason", "UNKNOWN")) if candidates else "NO_CANDIDATE"
+
+
 def parse_json(text: str) -> dict:
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end <= start:
+    # Accept plain JSON or a fenced JSON block; parse the first complete object
+    # rather than slicing to the final brace (which may be inside trailing text).
+    cleaned = re.sub(r"^\\s*```(?:json)?\\s*|\\s*```\\s*$", "", text.strip(), flags=re.I)
+    start = cleaned.find("{")
+    if start < 0:
         raise RuntimeError("Gemini did not return a JSON article.")
     try:
-        return json.loads(text[start:end + 1])
+        value, _ = json.JSONDecoder().raw_decode(cleaned[start:])
     except json.JSONDecodeError as exc:
         raise RuntimeError("Gemini returned invalid article JSON: " + str(exc)) from exc
+    if not isinstance(value, dict):
+        raise RuntimeError("Gemini response JSON must be an object.")
+    return value
+
+
+def generate_article(prompt: str) -> dict:
+    # One bounded repair attempt handles malformed/truncated model output without
+    # adding paid services or an unbounded generation loop.
+    for attempt in range(2):
+        response = create_interaction(prompt)
+        output, _ = extract_output(response)
+        finish_reason = candidate_finish_reason(response)
+        if not output:
+            error = f"Gemini returned no text (finishReason={finish_reason})."
+        else:
+            try:
+                return parse_json(output)
+            except RuntimeError as exc:
+                error = f"{exc} (finishReason={finish_reason})"
+        if attempt == 0:
+            log(f"{error} Requesting one JSON repair attempt.")
+            prompt = (
+                "Your previous response was not valid complete JSON. Correct it and return "
+                "ONLY one complete JSON object matching the exact schema and requirements "
+                "in the original request. Do not use Markdown fences or commentary. "
+                "Preserve all facts, source IDs, caveats and all four language versions. "
+                "If the full article cannot be completed reliably, return "
+                '{"no_publish":true,"reason":"Unable to produce a complete validated article."}.'
+                "\\n\\nPREVIOUS RESPONSE TO REPAIR:\\n" + output[:24000]
+            )
+        else:
+            raise RuntimeError(f"Gemini JSON generation failed after one repair attempt: {error}")
+    raise RuntimeError("Gemini JSON generation failed.")
 
 
 def fetch_article_page(url: str) -> dict | None:
@@ -369,11 +410,7 @@ def main() -> int:
     log(f"Collected {len(news_items)} readable RSS articles from publisher pages.")
     if len({item["domain"] for item in news_items}) < 1:
         raise RuntimeError("No readable publisher source was found; refusing to publish.")
-    interaction = create_interaction(article_prompt(existing, today, news_items))
-    output, _ = extract_output(interaction)
-    if not output:
-        raise RuntimeError("Gemini interaction returned no text output.")
-    article = parse_json(output)
+    article = generate_article(article_prompt(existing, today, news_items))
     if article.get("no_publish"):
         log(f"Skipping publication: {article.get('reason', 'No verified story found.')}")
         return 0
