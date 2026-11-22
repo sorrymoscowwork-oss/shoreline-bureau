@@ -6,10 +6,10 @@ on:
       timezone: "Africa/Cairo"
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Preview only — do not publish"
+      publish:
+        description: "Publish the validated article (leave off for a safe preview)"
         required: false
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -22,7 +22,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -34,13 +34,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Generate and publish editorial article
+      - name: Generate and validate editorial article
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
-            python scripts/publish_news.py --dry-run
-          else
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" = "true" ]; then
             python scripts/publish_news.py
+          else
+            python scripts/publish_news.py --dry-run
           fi
