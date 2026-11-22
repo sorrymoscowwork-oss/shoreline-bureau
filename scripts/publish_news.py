@@ -336,8 +336,12 @@ def main() -> int:
     today = datetime.now(ZoneInfo("Africa/Cairo")).date().isoformat()
     existing = json.loads(ARTICLES_FILE.read_text(encoding="utf-8"))
     log(f"Starting editorial research for {today}; dry_run={args.dry_run}")
-    interaction = create_interaction(article_prompt(existing, today))
-    output, citations = extract_output(interaction)
+    news_items = fetch_news_items()
+    log(f"Collected {len(news_items)} readable RSS articles from publisher pages.")
+    if len({item["domain"] for item in news_items}) < 2:
+        raise RuntimeError("Fewer than two independent readable publishers were found; refusing to publish.")
+    interaction = create_interaction(article_prompt(existing, today, news_items))
+    output, _ = extract_output(interaction)
     if not output:
         raise RuntimeError("Gemini interaction returned no text output.")
     article = parse_json(output)
@@ -345,7 +349,13 @@ def main() -> int:
         log(f"Skipping publication: {article.get('reason', 'No verified story found.')}")
         return 0
 
-    sources = collect_sources(citations)
+    selected_ids = article.get("source_ids", [])
+    if not isinstance(selected_ids, list) or len(set(selected_ids)) != len(selected_ids):
+        raise RuntimeError("Article source_ids must be a unique list.")
+    selected = [item for item in news_items if item["id"] in selected_ids]
+    if len(selected) < 2 or len({item["domain"] for item in selected}) < 2:
+        raise RuntimeError("Gemini must select at least two independent publisher sources from the research packet.")
+    sources = [{"label": f"{item['publisher']} — {item['title'][:130]}", "url": item["url"]} for item in selected]
     validate_article(article, sources)
     slug = clean_slug(article.get("slug", ""), "red-sea-update")
     known = existing.get("articles", [])
