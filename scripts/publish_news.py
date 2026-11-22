@@ -214,7 +214,7 @@ def fetch_article_page(url: str) -> dict | None:
             text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw))).strip()
         if len(text) < 450:
             return None
-        date_match = re.search(r'"datePublished"\\s*:\\s*"([^"]+)"', raw, re.I)
+        date_match = re.search(r'"datePublished"\s*:\s*"([^"]+)"', raw, re.I)
         if not date_match:
             date_match = re.search(r"""<time[^>]+datetime=["']([^"']+)""", raw, re.I)
         published = date_match.group(1) if date_match else ""
@@ -255,20 +255,30 @@ def fetch_news_items() -> list[dict]:
         if not headline or not link:
             return False
         summary = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
-        try:
-            published_at = parsedate_to_datetime(pub_date).timestamp()
-        except Exception:
+        published_at = None
+        if pub_date:
             try:
-                published_at = datetime.fromisoformat(pub_date.replace("Z", "+00:00")).timestamp()
+                published_at = parsedate_to_datetime(pub_date).timestamp()
             except Exception:
-                return False
-        if published_at < cutoff:
-            return False
-        searchable = (headline + " " + summary).lower()
-        if not any(term in searchable for term in relevant):
-            return False
+                try:
+                    published_at = datetime.fromisoformat(pub_date.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    published_at = None
         page = fetch_article_page(link)
         page_text = page["text"] if page else ""
+        if published_at is None and page and page.get("published"):
+            try:
+                published_at = datetime.fromisoformat(page["published"].replace("Z", "+00:00")).timestamp()
+            except Exception:
+                try:
+                    published_at = parsedate_to_datetime(page["published"]).timestamp()
+                except Exception:
+                    published_at = None
+        if published_at is None or published_at < cutoff:
+            return False
+        searchable = (headline + " " + summary + " " + page_text[:2500]).lower()
+        if not any(term in searchable for term in relevant):
+            return False
         article_text = page_text if len(page_text) >= 450 else summary
         if len(article_text) < 250:
             return False
@@ -372,9 +382,9 @@ def fetch_news_items() -> list[dict]:
             with urlopen(request, timeout=15) as response:
                 listing_html = response.read(1200000).decode("utf-8", errors="replace")
             links = {}
-            for match in re.finditer(r"""<a[^>]+href=["'](https://hurghada\\.news/article/[^"']+)["'][^>]*>(.*?)</a>""", listing_html, re.I | re.S):
+            for match in re.finditer(r"""<a[^>]+href=["'](https://hurghada\.news/article/[^"']+)["'][^>]*>(.*?)</a>""", listing_html, re.I | re.S):
                 url = html.unescape(match.group(1))
-                headline = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", match.group(2)))).strip()
+                headline = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", match.group(2)))).strip()
                 if headline and url not in links:
                     links[url] = headline
             log(f"Local listing {feed_name}: discovered {len(links)} article link(s).")
