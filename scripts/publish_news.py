@@ -216,7 +216,7 @@ def fetch_article_page(url: str) -> dict | None:
             return None
         date_match = re.search(r'"datePublished"\\s*:\\s*"([^"]+)"', raw, re.I)
         if not date_match:
-            date_match = re.search(r'<time[^>]+datetime=["\\']([^"\\']+)', raw, re.I)
+            date_match = re.search(r"""<time[^>]+datetime=["']([^"']+)""", raw, re.I)
         published = date_match.group(1) if date_match else ""
         return {"url": final_url, "title": title, "description": description, "text": text[:6500], "published": published}
     except Exception as exc:
