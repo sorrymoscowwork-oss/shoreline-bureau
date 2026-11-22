@@ -114,7 +114,7 @@ def fetch_article_page(url: str) -> dict | None:
     """Fetch readable public article text using only Python standard library."""
     request = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU-NewsBot/1.0)"})
     try:
-        with urlopen(request, timeout=20) as response:
+        with urlopen(request, timeout=8) as response:
             final_url = response.geturl()
             if "html" not in response.headers.get("Content-Type", "").lower():
                 return None
@@ -157,7 +157,7 @@ def fetch_news_items() -> list[dict]:
     for feed_name, feed_url in feeds:
         request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 SHORELINE-BUREAU/1.0"})
         try:
-            with urlopen(request, timeout=25) as response:
+            with urlopen(request, timeout=12) as response:
                 root = ET.fromstring(response.read())
         except Exception as exc:
             log(f"RSS feed unavailable ({feed_name}): {exc}")
@@ -213,18 +213,20 @@ def fetch_news_items() -> list[dict]:
                 "description": description,
                 "article_text": article_text[:6500],
             })
-            if len(collected) >= 20:
+            if len(collected) >= 12:
                 break
         log(f"RSS {feed_name}: collected {len(collected)} candidate(s) so far.")
+        if len(collected) >= 12:
+            break
     selected, domains = [], set()
     for item in collected:
         if item["domain"] not in domains:
             selected.append(item)
             domains.add(item["domain"])
     for item in collected:
-        if item not in selected and len(selected) < 14:
+        if item not in selected and len(selected) < 10:
             selected.append(item)
-    return selected[:14]
+    return selected[:10]
 
 
 def article_prompt(existing: dict, today: str, news_items: list[dict]) -> str:
