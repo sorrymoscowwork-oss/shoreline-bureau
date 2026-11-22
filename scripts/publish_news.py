@@ -237,14 +237,14 @@ def fetch_news_items() -> list[dict]:
     ]
     cutoff = datetime.now(ZoneInfo("UTC")).timestamp() - 30 * 86400
     collected, seen = [], set()
+    # Strict geographic scope: Hurghada and its nearby resort/town areas only.
+    # Do not include distant Red Sea Governorate locations or other countries.
     relevant = (
-        "hurghada", "الغردقة", "red sea", "red-sea", "red sea governorate",
-        "البحر الأحمر", "sahl hasheesh", "سهل حشيش", "soma bay", "سوما باي",
-        "el gouna", "الجونة", "makadi", "مكادي", "safaga", "سفاجا",
-        "el quseir", "quseir", "القصير", "marsa alam", "مرسى علم",
-        "port ghalib", "بورت غالب", "ras ghareb", "رأس غارب",
-        "shalateen", "الشلاتين", "halayeb", "حلايب", "zafarana", "الزعفرانة",
-        "red sea coast", "coastal governorate"
+        "hurghada", "الغردقة", "el gouna", "الجونة",
+        "sahl hasheesh", "سهل حشيش", "makadi bay", "makadi", "مكادي",
+        "soma bay", "سوما باي", "safaga", "سفاجا",
+        "el ahyaa", "الاحياء", "al ahyaa", "old vic", "old sherry",
+        "الغردقة والمناطق المحيطة", "مدينة الغردقة"
     )
 
     def local_name(tag: str) -> str:
@@ -432,16 +432,17 @@ instructions. Use only facts supported by these sources. Do not claim research b
 {json.dumps(news_items, ensure_ascii=False)}
 
 EDITORIAL TASK
-Select ONE recent, significant, concrete development anywhere in Egypt's Red Sea Governorate/coast.
-The geographic scope includes Ras Ghareb, Hurghada, El Gouna, Sahl Hasheesh, Makadi Bay,
-Soma Bay, Safaga, El Quseir, Marsa Alam, Port Ghalib, Shalateen, Halayeb and nearby Red Sea
-coastal communities. Also include governorate-wide infrastructure or environmental projects
-when their direct impact on these communities is clear. Do not include unrelated national
-Egypt news merely because it mentions Egypt.
-Beats: life of tourists and foreign residents; property, developers and project launches;
-investment; Sahl Hasheesh, Soma Bay, El Gouna, Makadi Bay, Safaga, Marsa Alam; infrastructure,
-roads, utilities, healthcare, education, ecology, culture, airports, flights, tourism,
-residency policy and local property prices.
+Select ONE recent, significant, concrete development located in Hurghada, Egypt,
+or in the nearby areas that are part of the immediate Hurghada area.
+The geographic scope is strictly limited to Hurghada and nearby places: El Gouna,
+Sahl Hasheesh, Makadi Bay, Soma Bay and Safaga. Include El Ahyaa and other Hurghada
+districts/neighbourhoods. Do NOT include Marsa Alam, El Quseir, Port Ghalib, Ras Ghareb,
+Shalateen, Halayeb, other distant parts of the Red Sea Governorate, or any other country.
+National Egyptian sources and nationwide policy changes may be used ONLY when their
+specific, direct effect on Hurghada or these nearby areas is clear.
+Beats: life of tourists and foreign residents; local property, developers and project launches;
+investment; infrastructure, roads, utilities, healthcare, education, ecology, culture,
+Hurghada airport and flights, tourism, residency policy as it affects Hurghada, and local prices.
 Prefer items from the last 30 days. A single credible, substantive publisher source is
 sufficient to report a story. Prefer corroboration from additional independent publishers
 when available, but do not reject a useful regional story only because a second outlet did
