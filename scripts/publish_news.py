@@ -16,10 +16,12 @@ import subprocess
 import sys
 import time
 import unicodedata
+import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
@@ -108,7 +110,105 @@ def parse_json(text: str) -> dict:
         raise RuntimeError(f"Gemini returned invalid article JSON: {exc}") from exc
 
 
-def article_prompt(existing: dict, today: str) -> str:
+def fetch_article_page(url: str) -> dict | None:
+    """Fetch readable public article text using only Python standard library."""
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU-NewsBot/1.0)"})
+    try:
+        with urlopen(request, timeout=20) as response:
+            final_url = response.geturl()
+            if "html" not in response.headers.get("Content-Type", "").lower():
+                return None
+            raw = response.read(1200000).decode("utf-8", errors="replace")
+        title_match = re.search(r"<title[^>]*>(.*?)</title>", raw, re.I | re.S)
+        title = html.unescape(re.sub(r"<[^>]+>", " ", title_match.group(1))).strip() if title_match else ""
+        desc_match = re.search(r'<meta[^>]+(?:name|property)=["\'](?:description|og:description)["\'][^>]+content=["\'](.*?)["\']', raw, re.I | re.S)
+        description = html.unescape(desc_match.group(1))[:600] if desc_match else ""
+        # Remove non-editorial blocks before extracting visible text.
+        raw = re.sub(r"(?is)<(script|style|nav|footer|header|aside|noscript).*?</\1>", " ", raw)
+        paragraphs = re.findall(r"(?is)<p[^>]*>(.*?)</p>", raw)
+        text = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", p)) for p in paragraphs)
+        text = re.sub(r"\s+", " ", text).strip()
+        if len(text) < 450:
+            text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw))).strip()
+        if len(text) < 450:
+            return None
+        return {"url": final_url, "title": title, "description": description, "text": text[:6500]}
+    except Exception as exc:
+        log(f"Could not read source page {url[:100]}: {exc}")
+        return None
+
+
+def fetch_news_items() -> list[dict]:
+    """Collect recent Red Sea news from public RSS search feeds and publisher pages."""
+    queries = [
+        'Hurghada OR "Red Sea" Egypt tourism property when:14d',
+        '"Sahl Hasheesh" OR "Soma Bay" OR "El Gouna" development when:14d',
+        'Egypt Red Sea airport flights infrastructure expats when:14d',
+        'Egypt Red Sea real estate investment developer when:14d',
+    ]
+    cutoff = datetime.now(ZoneInfo("UTC")).timestamp() - 45 * 86400
+    collected, seen = [], set()
+    for query in queries:
+        feed_url = "https://news.google.com/rss/search?q=" + quote(query) + "&hl=en&gl=EG&ceid=EG:en"
+        request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 SHORELINE-BUREAU/1.0"})
+        try:
+            with urlopen(request, timeout=25) as response:
+                root = ET.fromstring(response.read())
+        except Exception as exc:
+            log(f"RSS feed unavailable ({query[:55]}): {exc}")
+            continue
+        for node in root.findall("./channel/item"):
+            headline = (node.findtext("title") or "").strip()
+            link = (node.findtext("link") or "").strip()
+            pub_date = (node.findtext("pubDate") or "").strip()
+            source_node = node.find("source")
+            publisher = ((source_node.text or "").strip() if source_node is not None else "")
+            if not headline or not link:
+                continue
+            try:
+                if parsedate_to_datetime(pub_date).timestamp() < cutoff:
+                    continue
+            except Exception:
+                continue
+            page = fetch_article_page(link)
+            if not page:
+                continue
+            parsed = urlparse(page["url"])
+            if parsed.scheme != "https" or not parsed.netloc:
+                continue
+            domain = parsed.netloc.lower().removeprefix("www.")
+            canonical = f"https://{domain}{parsed.path}".rstrip("/")
+            if canonical in seen:
+                continue
+            seen.add(canonical)
+            collected.append({
+                "id": f"N{len(collected)+1}",
+                "title": page["title"] or headline,
+                "feed_title": headline,
+                "publisher": publisher or domain,
+                "domain": domain,
+                "published": pub_date,
+                "url": page["url"],
+                "description": page["description"],
+                "article_text": page["text"],
+            })
+            if len(collected) >= 18:
+                break
+        if len(collected) >= 18:
+            break
+    # Prioritize publisher diversity, then fill remaining slots with other sources.
+    selected, domains = [], set()
+    for item in collected:
+        if item["domain"] not in domains:
+            selected.append(item)
+            domains.add(item["domain"])
+    for item in collected:
+        if item not in selected and len(selected) < 12:
+            selected.append(item)
+    return selected[:12]
+
+
+def article_prompt(existing: dict, today: str, news_items: list[dict]) -> str:
     recent = existing.get("articles", [])[:30]
     archive = []
     for item in recent:
