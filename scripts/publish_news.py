@@ -337,32 +337,28 @@ def fetch_news_items() -> list[dict]:
     # GDELT DOC 2.0 is a free global news index. Search broadly across publishers,
     # including pages surfaced from public social platforms, but anchor every query
     # to Hurghada and its immediate neighbouring areas in Egypt.
-    gdelt_queries = [
-        '"Hurghada" OR "الغردقة"',
-        '"El Gouna" OR "الجونة" OR "Sahl Hasheesh" OR "سهل حشيش"',
-        '"Makadi Bay" OR "Makadi" OR "مكادي" OR "Soma Bay" OR "سوما باي"',
-        '"Safaga" OR "سفاجا" OR "El Ahyaa" OR "الاحياء"',
-        '("Hurghada" OR "الغردقة") AND (tourism OR hotel OR resort OR property OR real estate OR investment OR airport OR flight OR road OR infrastructure OR environment OR prices OR residents OR expats)',
-    ]
-    for query in gdelt_queries:
-        params = {
-            "query": query,
-            "mode": "ArtList",
-            "format": "json",
-            "maxrecords": "50",
-            "sort": "datedesc",
-            "startdatetime": datetime.now(ZoneInfo("UTC")).strftime("%Y%m%d") + "000000",
-            "enddatetime": datetime.now(ZoneInfo("UTC")).strftime("%Y%m%d") + "235959",
-        }
-        # Search the full 30-day window, not only today's date.
-        params["startdatetime"] = (datetime.now(ZoneInfo("UTC")) - timedelta(days=30)).strftime("%Y%m%d") + "000000"
-        endpoint = "https://api.gdeltproject.org/api/v2/doc/doc?" + urlencode(params)
-        request = Request(endpoint, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
-        found = 0
+    # One consolidated request avoids hammering the public GDELT endpoint.
+    # It searches only the approved Hurghada-area locations over the last 30 days.
+    query = '("Hurghada" OR "الغردقة" OR "El Gouna" OR "الجونة" OR "Sahl Hasheesh" OR "سهل حشيش" OR "Makadi Bay" OR "Makadi" OR "مكادي" OR "Soma Bay" OR "سوما باي" OR "Safaga" OR "سفاجا" OR "El Ahyaa" OR "الاحياء")'
+    now_utc = datetime.now(ZoneInfo("UTC"))
+    params = {
+        "query": query,
+        "mode": "ArtList",
+        "format": "json",
+        "maxrecords": "100",
+        "sort": "datedesc",
+        "startdatetime": (now_utc - timedelta(days=30)).strftime("%Y%m%d") + "000000",
+        "enddatetime": now_utc.strftime("%Y%m%d") + "235959",
+    }
+    endpoint = "https://api.gdeltproject.org/api/v2/doc/doc?" + urlencode(params)
+    request = Request(endpoint, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
+    for attempt in range(3):
         try:
-            with urlopen(request, timeout=25) as response:
-                payload = json.loads(response.read().decode("utf-8", errors="replace"))
+            with urlopen(request, timeout=35) as response:
+                raw_payload = response.read().decode("utf-8", errors="replace")
+            payload = json.loads(raw_payload)
             articles = payload.get("articles", []) if isinstance(payload, dict) else []
+            found = 0
             for item in articles:
                 headline = str(item.get("title") or "").strip()
                 link = str(item.get("url") or "").strip()
@@ -370,9 +366,27 @@ def fetch_news_items() -> list[dict]:
                 domain = str(item.get("domain") or "").strip()
                 if add_candidate(headline, link, date_value, domain, headline, "GDELT"):
                     found += 1
-            log(f"GDELT query [{query[:75]}]: {len(articles)} indexed result(s), {found} usable Hurghada candidate(s).")
+            log(f"GDELT consolidated search: {len(articles)} indexed result(s), {found} usable Hurghada-area candidate(s).")
+            break
+        except HTTPError as exc:
+            if exc.code == 429 and attempt < 2:
+                delay = 20 * (attempt + 1)
+                log(f"GDELT rate limited (429); waiting {delay}s before retry {attempt + 2}/3.")
+                time.sleep(delay)
+                continue
+            log(f"GDELT search unavailable (HTTP {exc.code}); continuing with other public sources.")
+            break
+        except (URLError, json.JSONDecodeError, TimeoutError) as exc:
+            if attempt < 2:
+                delay = 8 * (attempt + 1)
+                log(f"GDELT temporary error ({type(exc).__name__}); retrying in {delay}s.")
+                time.sleep(delay)
+                continue
+            log(f"GDELT search unavailable ({type(exc).__name__}: {str(exc)[:180]}); continuing with other public sources.")
+            break
         except Exception as exc:
-            log(f"GDELT query [{query[:75]}]: unavailable ({type(exc).__name__}: {str(exc)[:180]}).")
+            log(f"GDELT search unavailable ({type(exc).__name__}: {str(exc)[:180]}); continuing with other public sources.")
+            break
 
     # Local Hurghada publisher feeds (WordPress-style RSS endpoints).
     for feed_name, feed_url in [
@@ -596,6 +610,9 @@ def main() -> int:
     news_items = fetch_news_items()
     log(f"Collected {len(news_items)} readable RSS articles from publisher pages.")
     if len({item["domain"] for item in news_items}) < 1:
+        if args.dry_run:
+            log("DRY RUN: no qualifying local source found; no article generated and nothing published.")
+            return 0
         raise RuntimeError("No readable publisher source was found; refusing to publish.")
     article = generate_article(article_prompt(existing, today, news_items))
     if article.get("no_publish"):
