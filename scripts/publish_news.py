@@ -214,7 +214,11 @@ def fetch_article_page(url: str) -> dict | None:
             text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw))).strip()
         if len(text) < 450:
             return None
-        return {"url": final_url, "title": title, "description": description, "text": text[:6500]}
+        date_match = re.search(r'"datePublished"\\s*:\\s*"([^"]+)"', raw, re.I)
+        if not date_match:
+            date_match = re.search(r'<time[^>]+datetime=["\\']([^"\\']+)', raw, re.I)
+        published = date_match.group(1) if date_match else ""
+        return {"url": final_url, "title": title, "description": description, "text": text[:6500], "published": published}
     except Exception as exc:
         log(f"Could not read source page {url[:100]}: {exc}")
         return None
@@ -350,6 +354,41 @@ def fetch_news_items() -> list[dict]:
             log(f"RSS {feed_name}: {feed_collected} regional candidate(s); {len(collected)} total.")
         except Exception as exc:
             log(f"RSS {feed_name}: unavailable or invalid feed ({type(exc).__name__}: {str(exc)[:180]}).")
+
+    # Hurghada News is a live regional publisher with dated article pages.
+    # Discover links from its real category pages; article URLs use /article/<slug>.
+    local_pages = [
+        ("Hurghada News — News", "https://hurghada.news/category/news"),
+        ("Hurghada News — Business", "https://hurghada.news/category/business"),
+        ("Hurghada News — Travel", "https://hurghada.news/category/travel"),
+        ("Hurghada News — Real Estate", "https://hurghada.news/category/real-estate"),
+        ("Hurghada News — Environment", "https://hurghada.news/category/environment"),
+        ("Hurghada News — Community", "https://hurghada.news/category/community"),
+    ]
+    for feed_name, page_url in local_pages:
+        found = 0
+        request = Request(page_url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
+        try:
+            with urlopen(request, timeout=15) as response:
+                listing_html = response.read(1200000).decode("utf-8", errors="replace")
+            links = {}
+            for match in re.finditer(r"""<a[^>]+href=["'](https://hurghada\\.news/article/[^"']+)["'][^>]*>(.*?)</a>""", listing_html, re.I | re.S):
+                url = html.unescape(match.group(1))
+                headline = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", match.group(2)))).strip()
+                if headline and url not in links:
+                    links[url] = headline
+            log(f"Local listing {feed_name}: discovered {len(links)} article link(s).")
+            for url, headline in list(links.items())[:20]:
+                page = fetch_article_page(url)
+                if not page:
+                    continue
+                if add_candidate(headline or page["title"], page["url"], page.get("published", ""),
+                                 "Hurghada News", page.get("description", "") + " " + page["text"],
+                                 feed_name):
+                    found += 1
+            log(f"Local listing {feed_name}: {found} recent regional candidate(s); {len(collected)} total.")
+        except Exception as exc:
+            log(f"Local listing {feed_name}: unavailable ({type(exc).__name__}: {str(exc)[:180]}).")
 
     selected, domains = [], set()
     for item in collected:
