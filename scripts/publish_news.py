@@ -46,73 +46,74 @@ ARTICLE_TEMPLATE = """<!doctype html>
 </html>
 """
 LANGUAGES = ("en", "ru", "de", "zh")
-API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
-MODEL = "gemini-3.8-flash"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+MODEL = "gemini-2.5-flash"
 
 
 def log(message: str) -> None:
     print(f"[SHORELINE] {message}", flush=True)
 
 
-def gemini_request(payload: dict, method: str = "POST", interaction_id: str | None = None) -> dict:
+def gemini_request(prompt: str) -> dict:
+    """One free-tier Gemini 2.5 Flash request with Google Search grounding.
+
+    No paid fallback is configured. If free quota is unavailable, the run stops.
+    """
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("GitHub secret GEMINI_API_KEY is not available to this workflow.")
-    url = API_URL if method == "POST" else f"{API_URL}/{interaction_id}"
-    data = json.dumps(payload).encode("utf-8") if method == "POST" else None
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "tools": [{"google_search": {}}],
+        "generationConfig": {
+            "temperature": 0.35,
+            "responseMimeType": "application/json",
+            "maxOutputTokens": 30000
+        }
+    }
     req = Request(
-        url,
-        data=data,
-        method=method,
+        API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
         headers={"Content-Type": "application/json", "x-goog-api-key": key},
     )
     try:
-        with urlopen(req, timeout=180) as response:
+        with urlopen(req, timeout=240) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:1600]
+        if exc.code == 429:
+            raise RuntimeError(
+                "Gemini free-tier quota/rate limit reached (HTTP 429). "
+                "No paid fallback is configured; nothing was published. "
+                f"Google response: {detail}"
+            ) from exc
         raise RuntimeError(f"Gemini API returned HTTP {exc.code}: {detail}") from exc
     except URLError as exc:
         raise RuntimeError(f"Could not reach Gemini API: {exc.reason}") from exc
 
 
 def create_interaction(prompt: str) -> dict:
-    result = gemini_request({
-        "model": MODEL,
-        "input": prompt,
-        "tools": [{"type": "google_search"}],
-    })
-    if result.get("status") not in ("completed", "failed", "cancelled") and result.get("id"):
-        interaction_id = result["id"]
-        for _ in range(90):
-            time.sleep(5)
-            result = gemini_request({}, method="GET", interaction_id=interaction_id)
-            if result.get("status") in ("completed", "failed", "cancelled"):
-                break
-    if result.get("status") in ("failed", "cancelled"):
-        raise RuntimeError(f"Gemini interaction ended with status: {result.get('status')}")
-    return result
+    return gemini_request(prompt)
 
 
-def extract_output(interaction: dict) -> tuple[str, list[dict]]:
-    chunks: list[str] = []
-    citations: list[dict] = []
-    for step in interaction.get("steps", []):
-        if step.get("type") != "model_output":
-            continue
-        for block in step.get("content", []):
-            if block.get("type") != "text":
-                continue
-            if block.get("text"):
-                chunks.append(block["text"])
-            for annotation in block.get("annotations", []):
-                if annotation.get("type") == "url_citation" and annotation.get("url"):
-                    citations.append({
-                        "url": annotation["url"],
-                        "title": annotation.get("title") or "",
-                    })
-    if not chunks and interaction.get("output_text"):
-        chunks.append(interaction["output_text"])
+def extract_output(response: dict) -> tuple[str, list[dict]]:
+    candidates = response.get("candidates") or []
+    if not candidates:
+        block = response.get("promptFeedback", {})
+        raise RuntimeError(f"Gemini returned no candidate: {json.dumps(block, ensure_ascii=False)[:1000]}")
+    candidate = candidates[0]
+    chunks = []
+    for part in candidate.get("content", {}).get("parts", []):
+        if part.get("text"):
+            chunks.append(part["text"])
+    citations = []
+    grounding = candidate.get("groundingMetadata", {})
+    for chunk in grounding.get("groundingChunks", []):
+        web = chunk.get("web", {})
+        url = web.get("uri")
+        if url:
+            citations.append({"url": url, "title": web.get("title") or ""})
     return "\n".join(chunks).strip(), citations
 
 
