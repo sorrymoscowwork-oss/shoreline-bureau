@@ -1,0 +1,46 @@
+name: SHORELINE Editorial News
+
+on:
+  schedule:
+    - cron: "0 10 * * 3,6"
+      timezone: "Africa/Cairo"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview only — do not publish"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shoreline-editorial-news
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate and publish editorial article
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python scripts/publish_news.py --dry-run
+          else
+            python scripts/publish_news.py
+          fi
