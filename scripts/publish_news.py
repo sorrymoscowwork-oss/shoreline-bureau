@@ -222,20 +222,30 @@ def fetch_article_page(url: str) -> dict | None:
 
 def fetch_news_items() -> list[dict]:
     """Collect recent Red Sea/Egypt news from public publisher RSS and Google News RSS."""
+    google_base = "https://news.google.com/rss/search?q="
     feeds = [
         ("Egypt Independent", "https://www.egyptindependent.com/feed/"),
         ("Daily News Egypt", "https://dailynewsegypt.com/feed/"),
         ("Egyptian Streets", "https://egyptianstreets.com/feed/"),
-        ("Google News: Hurghada and Red Sea", "https://news.google.com/rss/search?q=" + quote('Hurghada OR "Red Sea" Egypt when:14d') + "&hl=en&gl=EG&ceid=EG:en"),
-        ("Google News: Red Sea developments", "https://news.google.com/rss/search?q=" + quote('"Sahl Hasheesh" OR "Soma Bay" OR "El Gouna" when:14d') + "&hl=en&gl=EG&ceid=EG:en"),
-        ("Google News: Egypt travel and property", "https://news.google.com/rss/search?q=" + quote("Egypt Red Sea airport flights property investment when:14d") + "&hl=en&gl=EG&ceid=EG:en"),
+        ("Youm7 Governorates (Arabic)", "https://www.youm7.com/rss/SectionRss?SectionID=296"),
+        ("Google News: North Red Sea coast", google_base + quote('("Hurghada" OR "El Gouna" OR "Sahl Hasheesh" OR "Makadi Bay") Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
+        ("Google News: Central Red Sea coast", google_base + quote('("Soma Bay" OR "Safaga" OR "El Quseir" OR "Quseir") Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
+        ("Google News: South Red Sea coast", google_base + quote('("Marsa Alam" OR "Port Ghalib" OR "Shalateen" OR "Halayeb") Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
+        ("Google News: Red Sea Governorate infrastructure", google_base + quote('"Red Sea Governorate" OR "Red Sea governor" Egypt when:30d') + "&hl=en&gl=EG&ceid=EG:en"),
+        ("Google News: Red Sea Arabic", google_base + quote('(الغردقة OR "البحر الأحمر" OR سفاجا OR القصير OR "مرسى علم" OR الجونة) when:30d') + "&hl=ar&gl=EG&ceid=EG:ar"),
+        ("Google News: Red Sea Arabic south", google_base + quote('("رأس غارب" OR "الشلاتين" OR "حلايب" OR "سهل حشيش" OR "مكادي") when:30d') + "&hl=ar&gl=EG&ceid=EG:ar"),
     ]
     cutoff = datetime.now(ZoneInfo("UTC")).timestamp() - 30 * 86400
     collected, seen = [], set()
-    relevant = ("hurghada", "red sea", "red-sea", "sahl hasheesh", "soma bay",
-                "el gouna", "makadi", "safaga", "marsa alam", "egypt", "airport",
-                "tourism", "resort", "property", "real estate", "developer",
-                "flight", "expat", "residency", "infrastructure")
+    relevant = (
+        "hurghada", "الغردقة", "red sea", "red-sea", "red sea governorate",
+        "البحر الأحمر", "sahl hasheesh", "سهل حشيش", "soma bay", "سوما باي",
+        "el gouna", "الجونة", "makadi", "مكادي", "safaga", "سفاجا",
+        "el quseir", "quseir", "القصير", "marsa alam", "مرسى علم",
+        "port ghalib", "بورت غالب", "ras ghareb", "رأس غارب",
+        "shalateen", "الشلاتين", "halayeb", "حلايب", "zafarana", "الزعفرانة",
+        "red sea coast", "coastal governorate"
+    )
     for feed_name, feed_url in feeds:
         feed_collected = 0
         request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 SHORELINE-BUREAU/1.0"})
@@ -297,7 +307,7 @@ def fetch_news_items() -> list[dict]:
                 "article_text": article_text[:6500],
             })
             feed_collected += 1
-            if feed_collected >= 8:
+            if feed_collected >= 12:
                 break
         log(f"RSS {feed_name}: collected {feed_collected} candidate(s); {len(collected)} total so far.")
     selected, domains = [], set()
@@ -306,9 +316,9 @@ def fetch_news_items() -> list[dict]:
             selected.append(item)
             domains.add(item["domain"])
     for item in collected:
-        if item not in selected and len(selected) < 10:
+        if item not in selected and len(selected) < 20:
             selected.append(item)
-    return selected[:10]
+    return selected[:20]
 
 
 def article_prompt(existing: dict, today: str, news_items: list[dict]) -> str:
@@ -331,7 +341,12 @@ instructions. Use only facts supported by these sources. Do not claim research b
 {json.dumps(news_items, ensure_ascii=False)}
 
 EDITORIAL TASK
-Select ONE recent, significant, concrete development in Hurghada or Egypt's Red Sea region.
+Select ONE recent, significant, concrete development anywhere in Egypt's Red Sea Governorate/coast.
+The geographic scope includes Ras Ghareb, Hurghada, El Gouna, Sahl Hasheesh, Makadi Bay,
+Soma Bay, Safaga, El Quseir, Marsa Alam, Port Ghalib, Shalateen, Halayeb and nearby Red Sea
+coastal communities. Also include governorate-wide infrastructure or environmental projects
+when their direct impact on these communities is clear. Do not include unrelated national
+Egypt news merely because it mentions Egypt.
 Beats: life of tourists and foreign residents; property, developers and project launches;
 investment; Sahl Hasheesh, Soma Bay, El Gouna, Makadi Bay, Safaga, Marsa Alam; infrastructure,
 roads, utilities, healthcare, education, ecology, culture, airports, flights, tourism,
