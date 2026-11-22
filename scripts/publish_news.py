@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SHORELINE BUREAU editorial publisher.
 
-Uses public RSS research and the free-tier Gemini Interactions API, validates a multilingual
+Uses public RSS research and the free-tier Gemini GenerateContent API, validates a multilingual
 article against the existing blog schema, then commits the article to the repo.
 No external Python packages are required.
 """
@@ -48,8 +48,8 @@ ARTICLE_TEMPLATE = """<!doctype html>
 </html>
 """
 LANGUAGES = ("en", "ru", "de", "zh")
-API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-3.5-flash-lite"
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 
 
 def log(message: str) -> None:
@@ -57,11 +57,10 @@ def log(message: str) -> None:
 
 
 def gemini_request(prompt: str) -> dict:
-    """Gemini 3.8 Flash via the free-tier Interactions API. No paid fallback."""
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("GitHub secret GEMINI_API_KEY is not available to this workflow.")
-    payload = {"model": MODEL, "input": prompt}
+    payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 30000}}
     body = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json", "x-goog-api-key": key}
     transient = {429, 500, 502, 503, 504}
@@ -70,26 +69,24 @@ def gemini_request(prompt: str) -> dict:
         try:
             with urlopen(req, timeout=300) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            if data.get("status") not in (None, "completed"):
-                raise RuntimeError(f"Gemini interaction did not complete: {data.get('status')}")
+            if not data.get("candidates"):
+                raise RuntimeError("Gemini returned no candidates: " + json.dumps(data.get("promptFeedback", {}))[:1000])
             return data
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:1600]
             if exc.code in transient and attempt < 2:
                 delay = (20, 45)[attempt]
-                log(f"Gemini returned HTTP {exc.code}; retrying in {delay}s (attempt {attempt + 2}/3).")
+                log("Gemini HTTP " + str(exc.code) + "; retrying in " + str(delay) + " seconds.")
                 time.sleep(delay)
                 continue
             if exc.code == 429:
-                raise RuntimeError("Gemini free-tier quota/rate limit reached (HTTP 429). No paid fallback is configured; nothing was published. " + detail) from exc
-            raise RuntimeError(f"Gemini Interactions API returned HTTP {exc.code}: {detail}") from exc
+                raise RuntimeError("Gemini free-tier quota/rate limit reached. No paid fallback is configured. " + detail) from exc
+            raise RuntimeError("Gemini GenerateContent API HTTP " + str(exc.code) + ": " + detail) from exc
         except URLError as exc:
             if attempt < 2:
-                delay = (20, 45)[attempt]
-                log(f"Gemini connection failed; retrying in {delay}s (attempt {attempt + 2}/3).")
-                time.sleep(delay)
+                time.sleep((20, 45)[attempt])
                 continue
-            raise RuntimeError(f"Could not reach Gemini API: {exc.reason}") from exc
+            raise RuntimeError("Could not reach Gemini API: " + str(exc.reason)) from exc
     raise RuntimeError("Gemini request failed after retries.")
 
 
@@ -98,26 +95,13 @@ def create_interaction(prompt: str) -> dict:
 
 
 def extract_output(response: dict) -> tuple[str, list[dict]]:
-    if response.get("output_text"):
-        return response["output_text"].strip(), []
     chunks = []
-    for step in response.get("steps", []):
-        if step.get("type") == "model_output":
-            for part in step.get("content", []):
-                if part.get("type") == "text" and part.get("text"):
-                    chunks.append(part["text"])
+    candidates = response.get("candidates") or []
+    if candidates:
+        for part in candidates[0].get("content", {}).get("parts", []):
+            if part.get("text"):
+                chunks.append(part["text"])
     return "\n".join(chunks).strip(), []
-
-
-def parse_json(text: str) -> dict:
-    cleaned = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", text, flags=re.I)
-    start, end = cleaned.find("{"), cleaned.rfind("}")
-    if start < 0 or end <= start:
-        raise RuntimeError("Gemini did not return a JSON article.")
-    try:
-        return json.loads(cleaned[start:end + 1])
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Gemini returned invalid article JSON: {exc}") from exc
 
 
 def fetch_article_page(url: str) -> dict | None:
