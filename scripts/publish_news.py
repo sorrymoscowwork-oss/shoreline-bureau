@@ -317,50 +317,39 @@ def fetch_news_items() -> list[dict]:
         except Exception as exc:
             log(f"RSS {feed_name}: unavailable or invalid feed ({type(exc).__name__}: {str(exc)[:180]}).")
 
-    # Local outlet has current, geographically focused reporting; discover article URLs
-    # from its public category page even if it does not expose a working RSS feed.
-    local_pages = [
-        ("Hurghada News", "https://hurghada.news/category/news"),
-        ("Hurghada News", "https://hurghada.news/category/business"),
-        ("Hurghada News", "https://hurghada.news/category/environment"),
-        ("Hurghada News", "https://hurghada.news/category/real-estate"),
-    ]
-    for publisher, page_url in local_pages:
-        page_count = 0
+    # Local Hurghada publisher feeds (WordPress-style RSS endpoints).
+    for feed_name, feed_url in [
+        ("Hurghada News", "https://hurghada.news/feed/"),
+        ("Hurghada News — local news", "https://hurghada.news/category/news/feed/"),
+        ("Hurghada News — business", "https://hurghada.news/category/business/feed/"),
+        ("Hurghada News — environment", "https://hurghada.news/category/environment/feed/"),
+        ("Hurghada News — real estate", "https://hurghada.news/category/real-estate/feed/"),
+    ]:
+        feed_collected = 0
+        request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)", "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"})
         try:
-            request = Request(page_url, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
             with urlopen(request, timeout=15) as response:
-                raw = response.read(900000).decode("utf-8", errors="replace")
-            # Collect canonical article links and titles from ordinary HTML anchors.
-            for match in re.finditer(r"""<a[^>]+href=['"](https://hurghada\.news/article/[^'"]+)['"][^>]*>(.*?)</a>""", raw, re.I | re.S):
-                link = html.unescape(match.group(1))
-        summary = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
-                if not headline:
-                    continue
-                # Article pages carry their own publication date; use page metadata when
-                # available rather than assigning the crawl date to old stories.
-                article = fetch_article_page(link)
-                if not article:
-                    continue
-                article_raw = article["text"]
-                    date_match = re.search(r'"datePublished"\s*:\s*"([^"]+)"', detail_html)
-                pub_date = date_match.group(1) if date_match else ""
-                if not pub_date:
-                    # Extract date from article page metadata, not the category listing.
-                    detail_request = Request(link, headers={"User-Agent": "Mozilla/5.0 (compatible; SHORELINE-BUREAU/1.0)"})
-                    with urlopen(detail_request, timeout=12) as detail_response:
-                        detail_html = detail_response.read(900000).decode("utf-8", errors="replace")
-                    date_match = re.search(r'"datePublished"\s*:\s*"([^"]+)"', detail_html)
-                    if not date_match:
-                        date_match = re.search(r"""<time[^>]+datetime=['"]([^'"]+)""", detail_html, re.I)
-                    pub_date = date_match.group(1) if date_match else ""
-                if add_candidate(headline or article["title"], link, pub_date, publisher, article_raw, publisher):
-                    page_count += 1
-                if page_count >= 12:
+                root = ET.fromstring(response.read())
+            nodes = [node for node in root.iter() if local_name(node.tag) in ("item", "entry")]
+            for node in nodes:
+                fields = {local_name(child.tag): child for child in list(node)}
+                headline_node = fields.get("title")
+                headline = (headline_node.text or "").strip() if headline_node is not None else ""
+                link_node = fields.get("link")
+                link = ""
+                if link_node is not None:
+                    link = (link_node.attrib.get("href") or link_node.text or "").strip()
+                date_node = fields.get("pubdate") or fields.get("published") or fields.get("updated") or fields.get("date")
+                pub_date = (date_node.text or "").strip() if date_node is not None else ""
+                desc_node = fields.get("encoded") or fields.get("description") or fields.get("summary") or fields.get("content")
+                summary = (desc_node.text or "") if desc_node is not None else ""
+                if add_candidate(headline, link, pub_date, feed_name, summary, feed_name):
+                    feed_collected += 1
+                if feed_collected >= 15:
                     break
-            log(f"Local listing {page_url}: {page_count} regional candidate(s); {len(collected)} total.")
+            log(f"RSS {feed_name}: {feed_collected} regional candidate(s); {len(collected)} total.")
         except Exception as exc:
-            log(f"Local listing {page_url}: unavailable ({type(exc).__name__}: {str(exc)[:180]}).")
+            log(f"RSS {feed_name}: unavailable or invalid feed ({type(exc).__name__}: {str(exc)[:180]}).")
 
     selected, domains = [], set()
     for item in collected:
