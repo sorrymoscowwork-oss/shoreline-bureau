@@ -139,30 +139,39 @@ def fetch_article_page(url: str) -> dict | None:
 
 
 def fetch_news_items() -> list[dict]:
-    """Collect recent Red Sea news from public RSS search feeds and publisher pages."""
-    queries = [
-        'Hurghada OR "Red Sea" Egypt tourism property when:14d',
-        '"Sahl Hasheesh" OR "Soma Bay" OR "El Gouna" development when:14d',
-        'Egypt Red Sea airport flights infrastructure expats when:14d',
-        'Egypt Red Sea real estate investment developer when:14d',
+    """Collect recent Red Sea/Egypt news from public publisher RSS and Google News RSS."""
+    feeds = [
+        ("Egypt Independent", "https://www.egyptindependent.com/feed/"),
+        ("Daily News Egypt", "https://dailynewsegypt.com/feed/"),
+        ("Egyptian Streets", "https://egyptianstreets.com/feed/"),
+        ("Google News: Hurghada and Red Sea", "https://news.google.com/rss/search?q=" + quote('Hurghada OR "Red Sea" Egypt when:14d') + "&hl=en&gl=EG&ceid=EG:en"),
+        ("Google News: Red Sea developments", "https://news.google.com/rss/search?q=" + quote('"Sahl Hasheesh" OR "Soma Bay" OR "El Gouna" when:14d') + "&hl=en&gl=EG&ceid=EG:en"),
+        ("Google News: Egypt travel and property", "https://news.google.com/rss/search?q=" + quote("Egypt Red Sea airport flights property investment when:14d") + "&hl=en&gl=EG&ceid=EG:en"),
     ]
     cutoff = datetime.now(ZoneInfo("UTC")).timestamp() - 45 * 86400
     collected, seen = [], set()
-    for query in queries:
-        feed_url = "https://news.google.com/rss/search?q=" + quote(query) + "&hl=en&gl=EG&ceid=EG:en"
+    relevant = ("hurghada", "red sea", "red-sea", "sahl hasheesh", "soma bay",
+                "el gouna", "makadi", "safaga", "marsa alam", "egypt", "airport",
+                "tourism", "resort", "property", "real estate", "developer",
+                "flight", "expat", "residency", "infrastructure")
+    for feed_name, feed_url in feeds:
         request = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 SHORELINE-BUREAU/1.0"})
         try:
             with urlopen(request, timeout=25) as response:
                 root = ET.fromstring(response.read())
         except Exception as exc:
-            log(f"RSS feed unavailable ({query[:55]}): {exc}")
+            log(f"RSS feed unavailable ({feed_name}): {exc}")
             continue
         for node in root.findall("./channel/item"):
             headline = (node.findtext("title") or "").strip()
             link = (node.findtext("link") or "").strip()
             pub_date = (node.findtext("pubDate") or "").strip()
             source_node = node.find("source")
-            publisher = ((source_node.text or "").strip() if source_node is not None else "")
+            publisher = ((source_node.text or "").strip() if source_node is not None else feed_name)
+            raw_summary = node.findtext("description") or ""
+            encoded = node.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") or ""
+            summary_html = encoded if len(encoded) > len(raw_summary) else raw_summary
+            summary = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", summary_html))).strip()
             if not headline or not link:
                 continue
             try:
@@ -171,9 +180,22 @@ def fetch_news_items() -> list[dict]:
             except Exception:
                 continue
             page = fetch_article_page(link)
-            if not page:
+            page_text = page["text"] if page else ""
+            article_text = page_text if len(page_text) >= 450 else summary
+            if len(article_text) < 450:
                 continue
-            parsed = urlparse(page["url"])
+            searchable = (headline + " " + summary + " " + article_text[:2500]).lower()
+            if not any(term in searchable for term in relevant):
+                continue
+            if page:
+                final_url = page["url"]
+                actual_title = page["title"] or headline
+                description = page["description"] or summary[:600]
+            else:
+                final_url = link
+                actual_title = headline
+                description = summary[:600]
+            parsed = urlparse(final_url)
             if parsed.scheme != "https" or not parsed.netloc:
                 continue
             domain = parsed.netloc.lower().removeprefix("www.")
@@ -183,29 +205,26 @@ def fetch_news_items() -> list[dict]:
             seen.add(canonical)
             collected.append({
                 "id": f"N{len(collected)+1}",
-                "title": page["title"] or headline,
-                "feed_title": headline,
+                "title": actual_title[:300],
                 "publisher": publisher or domain,
                 "domain": domain,
                 "published": pub_date,
-                "url": page["url"],
-                "description": page["description"],
-                "article_text": page["text"],
+                "url": final_url,
+                "description": description,
+                "article_text": article_text[:6500],
             })
-            if len(collected) >= 18:
+            if len(collected) >= 20:
                 break
-        if len(collected) >= 18:
-            break
-    # Prioritize publisher diversity, then fill remaining slots with other sources.
+        log(f"RSS {feed_name}: collected {len(collected)} candidate(s) so far.")
     selected, domains = [], set()
     for item in collected:
         if item["domain"] not in domains:
             selected.append(item)
             domains.add(item["domain"])
     for item in collected:
-        if item not in selected and len(selected) < 12:
+        if item not in selected and len(selected) < 14:
             selected.append(item)
-    return selected[:12]
+    return selected[:14]
 
 
 def article_prompt(existing: dict, today: str, news_items: list[dict]) -> str:
