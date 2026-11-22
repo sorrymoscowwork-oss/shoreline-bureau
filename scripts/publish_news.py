@@ -152,7 +152,7 @@ def fetch_news_items() -> list[dict]:
         ("Google News: Red Sea developments", "https://news.google.com/rss/search?q=" + quote('"Sahl Hasheesh" OR "Soma Bay" OR "El Gouna" when:14d') + "&hl=en&gl=EG&ceid=EG:en"),
         ("Google News: Egypt travel and property", "https://news.google.com/rss/search?q=" + quote("Egypt Red Sea airport flights property investment when:14d") + "&hl=en&gl=EG&ceid=EG:en"),
     ]
-    cutoff = datetime.now(ZoneInfo("UTC")).timestamp() - 45 * 86400
+    cutoff = datetime.now(ZoneInfo("UTC")).timestamp() - 30 * 86400
     collected, seen = [], set()
     relevant = ("hurghada", "red sea", "red-sea", "sahl hasheesh", "soma bay",
                 "el gouna", "makadi", "safaga", "marsa alam", "egypt", "airport",
@@ -258,9 +258,13 @@ Beats: life of tourists and foreign residents; property, developers and project 
 investment; Sahl Hasheesh, Soma Bay, El Gouna, Makadi Bay, Safaga, Marsa Alam; infrastructure,
 roads, utilities, healthcare, education, ecology, culture, airports, flights, tourism,
 residency policy and local property prices.
-Prefer items from the last 30 days. The story must be supported by at least TWO independent
-publishers (different domains), and the source text must contain substantive facts.
-Use only source IDs in this packet. Return no_publish=true if no story passes this standard.
+Prefer items from the last 30 days. A single credible, substantive publisher source is
+sufficient to report a story. Prefer corroboration from additional independent publishers
+when available, but do not reject a useful regional story only because a second outlet did
+not cover it. Clearly attribute claims to their source, distinguish official or company
+statements from independently verified facts, and state material uncertainty.
+Use only source IDs in this packet. Return no_publish=true only if the source is too weak,
+vague, outdated, or lacks enough concrete information for a useful article.
 Never invent names, quotes, numbers, prices, approvals, dates, project status or timelines.
 Distinguish an announcement, plan, construction milestone and completed facility.
 If reporting does not support a substantial factual article, skip publication.
@@ -327,8 +331,8 @@ def collect_sources(citations: list[dict]) -> list[dict]:
 def validate_article(data: dict, sources: list[dict]) -> None:
     if data.get("no_publish"):
         raise NoPublish(data.get("reason", "No verified news selected."))
-    if len(sources) < 2:
-        raise RuntimeError("Fewer than two independent publisher RSS sources were selected; refusing to publish.")
+    if len(sources) < 1:
+        raise RuntimeError("No credible publisher source was selected; refusing to publish.")
     if not isinstance(data.get("category"), dict) or not isinstance(data.get("lang"), dict):
         raise RuntimeError("Article is missing category or language data.")
     for language in LANGUAGES:
@@ -363,8 +367,8 @@ def main() -> int:
     log(f"Starting editorial research for {today}; dry_run={args.dry_run}")
     news_items = fetch_news_items()
     log(f"Collected {len(news_items)} readable RSS articles from publisher pages.")
-    if len({item["domain"] for item in news_items}) < 2:
-        raise RuntimeError("Fewer than two independent readable publishers were found; refusing to publish.")
+    if len({item["domain"] for item in news_items}) < 1:
+        raise RuntimeError("No readable publisher source was found; refusing to publish.")
     interaction = create_interaction(article_prompt(existing, today, news_items))
     output, _ = extract_output(interaction)
     if not output:
@@ -378,8 +382,8 @@ def main() -> int:
     if not isinstance(selected_ids, list) or len(set(selected_ids)) != len(selected_ids):
         raise RuntimeError("Article source_ids must be a unique list.")
     selected = [item for item in news_items if item["id"] in selected_ids]
-    if len(selected) < 2 or len({item["domain"] for item in selected}) < 2:
-        raise RuntimeError("Gemini must select at least two independent publisher sources from the research packet.")
+    if len(selected) < 1:
+        raise RuntimeError("Gemini must select at least one credible publisher source from the research packet.")
     sources = [{"label": f"{item['publisher']} — {item['title'][:130]}", "url": item["url"]} for item in selected]
     validate_article(article, sources)
     slug = clean_slug(article.get("slug", ""), "red-sea-update")
