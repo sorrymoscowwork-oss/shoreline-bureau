@@ -14,7 +14,8 @@
     .brand-lockup{display:flex;flex-direction:column;align-items:flex-start;align-content:flex-start;width:max-content;gap:5px}.brand-lockup .wordmark{display:block;align-self:flex-start;margin:0;padding:0}.brand-lockup .brand-division{display:block;align-self:flex-start;margin:0;padding:0;text-indent:0;font-size:8px;line-height:1;letter-spacing:.12em;text-transform:uppercase;font-weight:500;color:#777}
     main { min-height:calc(100vh - 93px); }
     .landing { min-height:calc(100vh - 93px); position:relative; display:grid; grid-template-columns:50% 50%; overflow:hidden; background:#fff; }
-    .landing-image { grid-column:1; grid-row:1; min-height:calc(100vh - 93px); overflow:hidden; background:#b6a28b; }
+    .landing-image { position:relative; grid-column:1; grid-row:1; min-height:calc(100vh - 93px); overflow:hidden; background:#b6a28b; }
+    .landing-image::after { content:""; position:absolute; inset:0; background:rgba(0,0,0,.16); pointer-events:none; }
     .landing-image img { display:block; width:100%; height:100%; min-height:calc(100vh - 93px); object-fit:cover; object-position:center 52%; }
     .landing-location { position:absolute; z-index:2; top:calc(23% + clamp(30px,4.2vw,70px) * .98 + 16px); left:0; width:100%; display:grid; grid-template-columns:50% 50%; align-items:baseline; margin:0; font-size:clamp(16px,1.4vw,21px); font-weight:600; letter-spacing:-.045em; line-height:1; text-transform:uppercase; pointer-events:none; }
     .landing-location .hurghada { color:#fff; text-align:right; padding-right:.08em; }
