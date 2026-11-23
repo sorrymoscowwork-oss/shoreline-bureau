@@ -22,8 +22,8 @@
     .landing-tagline { position:absolute; z-index:2; top:calc(23% + clamp(30px,4.2vw,70px) * .98 + 16px + clamp(16px,1.4vw,21px) + 6px); left:0; width:100%; display:grid; grid-template-columns:50% 50%; grid-auto-rows:auto; row-gap:4px; align-items:baseline; margin:0; font-size:clamp(11px,1vw,15px); font-weight:500; letter-spacing:-.045em; line-height:1.15; pointer-events:none; }
     .landing-tagline .independent { grid-column:2; color:var(--ink); text-align:left; padding-left:.08em; font-weight:700; }
     .landing-tagline .interests { grid-column:2; color:var(--ink); text-align:left; padding-left:.08em; }
-    .landing-promise { position:absolute; z-index:2; top:44%; left:0; width:100%; margin:0; padding:0 clamp(12px,2vw,30px); color:var(--ink); font-size:clamp(25px,3.1vw,48px); font-weight:700; line-height:.98; letter-spacing:-.065em; text-transform:uppercase; text-align:center; }
-    .landing-promise span { position:absolute; inset:0; display:block; padding:inherit; text-align:inherit; }
+    .landing-promise { position:absolute; z-index:2; top:44%; left:0; width:100%; display:grid; grid-template-columns:1fr; margin:0; padding:0 clamp(12px,2vw,30px); color:var(--ink); font-size:clamp(25px,3.1vw,48px); font-weight:700; line-height:.98; letter-spacing:-.065em; text-transform:uppercase; text-align:center; }
+    .landing-promise span { position:relative; grid-area:1 / 1; display:block; padding:inherit; text-align:inherit; }
     .landing-promise .promise-light { color:#fff; clip-path:inset(0 50% 0 0); }
     .landing-promise .promise-blue { color:#337695; clip-path:inset(0 0 0 50%); }
     .landing-wordmark { position:absolute; z-index:2; inset:23% 0 auto; width:100%; display:grid; grid-template-columns:50% 50%; align-items:baseline; margin:0; white-space:nowrap; font-size:clamp(30px,4.2vw,70px); line-height:.9; letter-spacing:-.095em; font-weight:700; pointer-events:none; }
